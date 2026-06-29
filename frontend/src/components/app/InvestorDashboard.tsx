@@ -204,11 +204,9 @@ export default function InvestorDashboard() {
 function ConnectGate({ ready, onConnect }: { ready: boolean; onConnect: () => void }) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-content flex-col items-center justify-center px-5 py-20 text-center">
-      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-ink">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/sawit-fi-icon-white.svg" alt="" className="h-10 w-10" />
-      </div>
-      <h1 className="mt-6 font-display text-3xl font-semibold tracking-tighter2 text-ink sm:text-4xl">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/sawit-fi-icon-black.svg" alt="" className="h-36 w-36" />
+      <h1 className="mt-1 font-display text-3xl font-semibold tracking-tighter2 text-ink sm:text-4xl">
         Your palm-oil portfolio
       </h1>
       <p className="mt-3 max-w-md font-serif text-lg leading-relaxed text-muted">

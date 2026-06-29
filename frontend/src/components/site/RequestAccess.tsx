@@ -117,8 +117,8 @@ export default function RequestAccess({
 
             {phase === 'success' ? (
               <div className="p-8 text-center">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-tint">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E7A4F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBFBFC" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 12.5l4 4 10-10" />
                   </svg>
                 </div>

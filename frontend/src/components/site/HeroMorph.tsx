@@ -70,13 +70,13 @@ export default function HeroMorph() {
           <div className="relative mx-auto flex w-full max-w-content items-center justify-center px-5">
             <motion.h1
               style={{ x: leftX, scale: titleScale, color: titleColor, textShadow: titleShadow }}
-              className="absolute right-1/2 origin-right whitespace-nowrap pr-3 text-right font-display text-3xl font-semibold tracking-tighter2 sm:text-4xl lg:text-[54px]"
+              className="absolute right-1/2 origin-right whitespace-nowrap pr-[0.14em] text-right font-display text-3xl font-semibold tracking-tighter2 sm:text-4xl lg:text-[54px]"
             >
               The open
             </motion.h1>
             <motion.h1
               style={{ x: rightX, scale: titleScale, color: titleColor, textShadow: titleShadow }}
-              className="absolute left-1/2 origin-left whitespace-nowrap pl-3 text-left font-display text-3xl font-semibold tracking-tighter2 sm:text-4xl lg:text-[54px]"
+              className="absolute left-1/2 origin-left whitespace-nowrap pl-[0.14em] text-left font-display text-3xl font-semibold tracking-tighter2 sm:text-4xl lg:text-[54px]"
             >
               palm economy.
             </motion.h1>
