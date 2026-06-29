@@ -1,0 +1,41 @@
+[package]
+name = "sawit-deploy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "deploy"
+path = "src/deploy.rs"
+
+[[bin]]
+name = "record"
+path = "src/record.rs"
+
+[[bin]]
+name = "read_state"
+path = "src/read_state.rs"
+
+[[bin]]
+name = "mint"
+path = "src/mint.rs"
+
+[[bin]]
+name = "fund"
+path = "src/fund.rs"
+
+[[bin]]
+name = "claim"
+path = "src/claim.rs"
+
+# The livenet backend is optional + feature-gated so that `cargo test` / `cargo build`
+# for the rest of the workspace never pulls it in. Real deploys use --features livenet.
+[features]
+livenet = ["dep:odra-casper-livenet-env"]
+
+[dependencies]
+odra = { workspace = true }
+production-vault = { path = "../contracts/production-vault" }
+sawit-token = { path = "../contracts/sawit-token" }
+token-minter = { path = "../contracts/token-minter" }
+yield-distributor = { path = "../contracts/yield-distributor" }
+odra-casper-livenet-env = { version = "2.8.2", optional = true }
