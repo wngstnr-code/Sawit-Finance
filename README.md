@@ -6,7 +6,7 @@
 
 Built for the **Casper Agentic Buildathon 2026**.
 
-**🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance)
+**🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt)
 
 > ### ✅ Verify it yourself in 30 seconds
 > - **🟢 Use it:** [sawitfinance.xyz](https://sawitfinance.xyz) — connect a Casper wallet and claim real CSPR yield
@@ -211,7 +211,7 @@ deploy/      livenet deploy + record/mint/fund/claim bins + read_state/read_bala
 frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live reads & claims)
 ```
 
-Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)**
+Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
 
 ---
 

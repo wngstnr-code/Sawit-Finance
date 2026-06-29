@@ -20,6 +20,24 @@ export default function SiteFooter() {
               Tokenized Indonesian palm oil on Casper. Built for the Casper
               Agentic Buildathon 2026.
             </p>
+            <div className="mt-4 flex items-center gap-4 text-[13px]">
+              <a
+                href="https://x.com/wnsstt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted transition-colors hover:text-brand"
+              >
+                X ↗
+              </a>
+              <a
+                href="https://github.com/wngstnr-code/Sawit-Finance"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted transition-colors hover:text-brand"
+              >
+                GitHub ↗
+              </a>
+            </div>
           </div>
 
           <div>
