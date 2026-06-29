@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { STATE_SNAPSHOT } from '@/lib/stateSnapshot';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -97,15 +98,15 @@ export async function GET() {
     });
   }
 
-  // No cache yet — do the (slow) first read.
+  // No cache yet — do the (slow) first live read.
   try {
     const state = await runBridge();
     saveCache(state);
     return NextResponse.json({ state, readAt: Date.now() });
-  } catch (e) {
-    return NextResponse.json(
-      { error: 'on-chain read failed', detail: String(e) },
-      { status: 502 }
-    );
+  } catch {
+    // Live bridge unavailable (e.g. serverless/Vercel can't run the native
+    // read_state binary) — serve the committed real on-chain snapshot so the
+    // genuine numbers still render instead of failing.
+    return NextResponse.json({ state: STATE_SNAPSHOT, snapshot: true });
   }
 }
