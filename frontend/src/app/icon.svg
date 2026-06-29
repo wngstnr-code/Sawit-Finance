@@ -1,0 +1,22 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Sawit Finance</title>
+  <rect width="400" height="400" rx="92" fill="#0B0B0C"/>
+  <g transform="translate(200, 214) scale(1.55)">
+    <path d="M0,42 Q0,20 0,0" stroke="#FFFFFF" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <ellipse cx="-44" cy="44" rx="28" ry="22" fill="#FFFFFF"/>
+    <ellipse cx="44" cy="44" rx="28" ry="22" fill="#FFFFFF"/>
+    <ellipse cx="0" cy="58" rx="28" ry="22" fill="#FFFFFF"/>
+    <ellipse cx="-60" cy="14" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="60" cy="14" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="-36" cy="-14" rx="26" ry="21" fill="#FFFFFF"/>
+    <ellipse cx="36" cy="-14" rx="26" ry="21" fill="#FFFFFF"/>
+    <ellipse cx="0" cy="-7" rx="28" ry="22" fill="#FFFFFF"/>
+    <ellipse cx="-52" cy="-42" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="52" cy="-42" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="-19" cy="-56" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="19" cy="-56" rx="25" ry="20" fill="#FFFFFF"/>
+    <ellipse cx="-27" cy="-76" rx="22" ry="18" fill="#FFFFFF"/>
+    <ellipse cx="27" cy="-76" rx="22" ry="18" fill="#FFFFFF"/>
+    <ellipse cx="0" cy="-86" rx="23" ry="18" fill="#FFFFFF"/>
+  </g>
+</svg>
