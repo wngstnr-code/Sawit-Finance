@@ -1,73 +1,53 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useClickRef } from '@make-software/csprclick-ui';
-import { CONTRACTS } from './config';
-
-type FtOwnership = {
-  balance?: string;
-  contract_package_hash?: string;
-};
-
-// CSPR.cloud's ft-token-ownership endpoint doesn't index this freshly-deployed
-// custom CEP-18 token, so it returns nothing for SAWIT holders. For known demo
-// holders we fall back to their REAL on-chain balance (read via the read_state
-// bridge / token.balance_of). Keyed by public key.
-const KNOWN_SAWIT: Record<string, number> = {
-  // user's wallet (account 1)
-  '0202111d3b480feaea33ce6839d087d9f685a3348fba27008221f52dfe2034656adc': 100,
-  // deployer — minted 2,260,000 then transferred 100 to account 1
-  '016410a22de86e0de234120f29272d5b1096caa60b3cf8a3b396d49e5399ad5428': 2_259_900,
-};
+import { PublicKey } from 'casper-js-sdk';
 
 /**
- * Reads the connected account's live SAWIT (CEP-18) balance through CSPR.click's
- * built-in CSPR.cloud proxy — no separate API key needed. Returns the on-chain
- * integer balance (SAWIT uses 0 display decimals, see config), or 0 if the
- * account holds none.
+ * Reads the connected account's live SAWIT (CEP-18) balance from the chain via
+ * the `/api/balance` route (backed by the `read_balance` Odra bridge). CSPR.cloud
+ * can't surface Odra's internal token state, so we read it directly. Returns the
+ * on-chain integer balance (SAWIT uses 0 display decimals), or 0 if none.
  */
 export function useSawitBalance(publicKey?: string) {
-  const clickRef = useClickRef();
   const [balance, setBalance] = useState<number | null>(null);
+  // per-account claimable CSPR for the current epoch (whole CSPR), or null
+  const [claimable, setClaimable] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!clickRef || !publicKey) {
+    if (!publicKey) {
       setBalance(null);
+      setClaimable(null);
       return;
     }
     setLoading(true);
     setErr(null);
     try {
-      const proxy = clickRef.getCsprCloudProxy?.();
-      if (!proxy) throw new Error('CSPR.cloud proxy unavailable');
-      const resp = await proxy.fetch(
-        `/accounts/${publicKey}/ft-token-ownership?page_size=100`
-      );
-      if (resp.error) throw new Error(resp.error.message);
-      const rows = (Array.isArray(resp.data) ? resp.data : []) as FtOwnership[];
-      const row = rows.find(
-        (r) =>
-          (r.contract_package_hash || '').toLowerCase() ===
-          CONTRACTS.sawitToken.toLowerCase()
-      );
-      const fromCloud = row ? Number(row.balance ?? 0) : 0;
-      // Prefer the indexed value; fall back to the known on-chain balance when
-      // CSPR.cloud doesn't surface this custom token (returns 0).
-      const fallback = KNOWN_SAWIT[(publicKey || '').toLowerCase()] ?? 0;
-      setBalance(fromCloud > 0 ? fromCloud : fallback);
+      const accountHash = PublicKey.fromHex(publicKey)
+        .accountHash()
+        .toHex()
+        .replace(/^account-hash-/, '');
+      const r = await fetch(`/api/balance?account=${accountHash}`, {
+        cache: 'no-store',
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'balance read failed');
+      setBalance(Number(j.balance ?? 0));
+      setClaimable(Number(j.claimable_motes ?? 0) / 1e9);
     } catch (e) {
       setErr(String(e));
-      setBalance(KNOWN_SAWIT[(publicKey || '').toLowerCase()] ?? null);
+      setBalance(null);
+      setClaimable(null);
     } finally {
       setLoading(false);
     }
-  }, [clickRef, publicKey]);
+  }, [publicKey]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  return { balance, loading, err, reload: load };
+  return { balance, claimable, loading, err, reload: load };
 }

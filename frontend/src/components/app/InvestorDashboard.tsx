@@ -43,17 +43,10 @@ type BandItem = { label: string; value: string; sub?: string; accent?: boolean }
 
 /* ─────────────────────────── derived helpers ─────────────────────────── */
 
-// Per-account claimable CSPR is operator-set on-chain (set_claimable) and isn't
-// surfaced by CSPR.cloud, so for known demo holders we show their real allocation
-// instead of the pro-rata estimate (which is 0 until total_distributed > 0).
-const KNOWN_CLAIMABLE: Record<string, number> = {
-  '0202111d3b480feaea33ce6839d087d9f685a3348fba27008221f52dfe2034656adc': 25,
-};
-
 function useDerived(
   state: ContractState | null,
   balance: number | null,
-  publicKey?: string
+  claimable: number | null
 ) {
   return useMemo(() => {
     const supply = state ? Number(state.total_sawit_supply) : 0;
@@ -61,8 +54,9 @@ function useDerived(
     const distributed = state
       ? fromBaseUnits(state.total_distributed_cspr, CSPR_DECIMALS)
       : 0;
-    const known = KNOWN_CLAIMABLE[(publicKey || '').toLowerCase()];
-    const estYield = known ?? share * distributed;
+    // Real per-account claimable (operator-set, read from chain); fall back to the
+    // pro-rata estimate only when we don't have a concrete allocation.
+    const estYield = claimable && claimable > 0 ? claimable : share * distributed;
     const cpoValueM = state
       ? (state.total_tons_cpo * state.latest_cpo_price_cents) / 100 / 1_000_000
       : 0;
@@ -75,7 +69,7 @@ function useDerived(
       ? Math.max(0, Math.ceil((state.latest_epoch_claim_deadline_ms - Date.now()) / 86_400_000))
       : null;
     return { supply, share, distributed, estYield, cpoValueM, revenueToHolders, projPerSawit, daysLeft };
-  }, [state, balance, publicKey]);
+  }, [state, balance, claimable]);
 }
 
 /* ─────────────────────────── root ─────────────────────────── */
@@ -84,10 +78,10 @@ export default function InvestorDashboard() {
   const { clickRef, publicKey, connected, ready, connect, disconnect } =
     useAccount();
   const state = useChainState();
-  const { balance, loading: balLoading, reload } = useSawitBalance(publicKey);
+  const { balance, claimable, loading: balLoading, reload } = useSawitBalance(publicKey);
   const [tab, setTab] = useState<Tab>('overview');
   const [claim, setClaim] = useState<ClaimPhase>({ phase: 'idle' });
-  const d = useDerived(state, balance, publicKey);
+  const d = useDerived(state, balance, claimable);
 
   async function handleClaim() {
     if (!clickRef || !publicKey || !state) return;
@@ -401,7 +395,7 @@ function OverviewPanel({
       {hasSawit ? (
         <aside className="flex flex-col rounded-2xl border border-line bg-card p-7 shadow-card">
           <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-faint">Next action</div>
-          <div className="mt-4 grid h-12 w-12 place-items-center rounded-full bg-brand-tint text-brand">
+          <div className="mt-4 grid h-12 w-12 place-items-center rounded-full bg-ink text-bg">
             <CoinIcon />
           </div>
           <div className="mt-5 font-display text-2xl font-semibold tracking-tightish text-ink">
@@ -421,7 +415,7 @@ function OverviewPanel({
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-muted">Est. gas</span>
-                <span className="text-ink">~3 CSPR</span>
+                <span className="text-ink">~10 CSPR</span>
               </div>
             </div>
           )}
