@@ -8,6 +8,11 @@ Built for the **Casper Agentic Buildathon 2026**.
 
 **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance)
 
+> ### ✅ Verify it yourself in 30 seconds
+> - **🟢 Use it:** [sawitfinance.xyz](https://sawitfinance.xyz) — connect a Casper wallet and claim real CSPR yield
+> - **⛓️ See the loop on-chain:** KYC-gated yield claim [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) on cspr.live (record→mint→fund→claim — [full loop below](#live-on-casper-testnet--the-full-loop-executed-on-chain))
+> - **🤖 Agentic AI:** [Casper MCP server](#the-agentic-layer) (7 live-state tools) + x402 **live settlement** [`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856) — a real CSPR transfer for a paid agent request
+
 ---
 
 ## The Problem
