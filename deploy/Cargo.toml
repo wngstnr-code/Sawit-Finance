@@ -27,6 +27,10 @@ path = "src/fund.rs"
 name = "claim"
 path = "src/claim.rs"
 
+[[bin]]
+name = "grant"
+path = "src/grant.rs"
+
 # The livenet backend is optional + feature-gated so that `cargo test` / `cargo build`
 # for the rest of the workspace never pulls it in. Real deploys use --features livenet.
 [features]

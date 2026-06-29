@@ -82,18 +82,27 @@ export default function InvestorDashboard() {
     try {
       setClaim({ phase: 'signing' });
       const tx = buildClaimTransaction(publicKey, state.current_distribution_epoch);
-      const res = await clickRef.send(tx.toJSON() as unknown as object, publicKey);
-      const hash =
-        (res as { transactionHash?: string; deployHash?: string })?.transactionHash ||
-        (res as { deployHash?: string })?.deployHash;
+      const json = tx.toJSON();
+      // eslint-disable-next-line no-console
+      console.log('[claim] epoch', state.current_distribution_epoch, 'tx.toJSON →', json);
+      const res = await clickRef.send(json as unknown as object, publicKey);
+      // eslint-disable-next-line no-console
+      console.log('[claim] send() result →', res);
+      const r = res as { transactionHash?: string; deployHash?: string } | undefined;
+      const hash = r?.transactionHash || r?.deployHash;
       if (hash) {
         setClaim({ phase: 'sent', hash });
         setTimeout(reload, 4000);
       } else {
-        setClaim({ phase: 'error', message: 'Cancelled or not submitted.' });
+        const detail = res
+          ? JSON.stringify(res).slice(0, 240)
+          : 'send() returned undefined (no response from wallet/proxy)';
+        setClaim({ phase: 'error', message: `Not submitted — ${detail}` });
       }
     } catch (e) {
-      setClaim({ phase: 'error', message: String(e) });
+      // eslint-disable-next-line no-console
+      console.error('[claim] send() threw →', e);
+      setClaim({ phase: 'error', message: String(e instanceof Error ? e.message : e) });
     }
   }
 
