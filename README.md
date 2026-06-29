@@ -88,8 +88,48 @@ python agents/x402.py     # → 5 handshake checks: valid / replay / underpay / 
 
 > **What's real vs. pending:** the full handshake + cryptographic payment authorization run today. On-chain *settlement* (the facilitator broadcasting the authorized transfer) activates once the agent has a funded Testnet key. Note: KPBN/MPOB don't natively speak x402, so the gated endpoints are Sawit Finance's own facilitator standing in for them — an honest prototype of agent-pays-for-data commerce.
 
-### Blockchain Reads (CSPR.cloud / MCP-ready)
-The Market Analyst Agent reads blockchain state (contract named-keys, epoch records, token balances) via the **CSPR.cloud REST API** today. This is the same data surface the Casper MCP Server exposes, so wrapping these reads as MCP tools for native LLM tool-calling is a drop-in next step — the agent logic already treats chain reads as a typed interface.
+### Casper MCP Server (Model Context Protocol)
+Sawit Finance ships a real **MCP server** (`agents/mcp_server.py`) that exposes the
+protocol's live on-chain state to any MCP-compatible AI agent as standardized
+*tools* — the Casper AI Toolkit pattern. Instead of bespoke API glue, an LLM
+(Claude, etc.) can query SAWIT chain state through tool calls:
+
+| MCP tool | Returns |
+|----------|---------|
+| `get_protocol_state` | SAWIT supply, verified CPO value/tons/price, GORR, oracle reputation, epochs, claim window |
+| `get_oracle_reputation` | rolling on-chain accuracy score (0–100) + interpretation |
+| `get_account_position` | a holder's SAWIT balance + claimable CSPR (by public key) |
+| `get_palm_oil_price` | live FRED `PPOILUSDM` (IMF) palm-oil price |
+| `get_contracts` / `get_economic_loop` | deployed package hashes + executed-loop tx hashes (cspr.live links) |
+| `refresh_protocol_state` | force a fresh live read of all four contracts |
+
+Reads go through the same `read_state` / `read_balance` bridges the frontend uses
+(CSPR.cloud can't see Odra's internal state, so we read it directly via Odra's
+livenet client). Built on the official **MCP SDK** (`mcp[cli]`).
+
+```bash
+# Verify the tools end-to-end (no MCP client needed):
+./.venv/bin/python agents/mcp_test.py
+
+# Run the MCP server (stdio transport):
+./.venv/bin/python agents/mcp_server.py
+```
+
+Connect it to **Claude Desktop** by adding to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "sawit-finance": {
+      "command": "/ABS/PATH/.venv/bin/python",
+      "args": ["/ABS/PATH/agents/mcp_server.py"]
+    }
+  }
+}
+```
+
+Then ask Claude things like *"What's Sawit Finance's oracle reputation and SAWIT
+supply right now?"* — it calls the MCP tools and answers from live on-chain state.
 
 ---
 
@@ -155,6 +195,8 @@ Sawit-Finance/
 │   ├── oracle_agent.py          # AI Oracle: live price + GAPKI/KPBN/MPOB + Gemini reasoning
 │   ├── yield_router.py          # AI Yield Router: monitors CPO price, triggers distribution
 │   ├── market_analyst_agent.py  # AI Analyst: reads contracts + Gemini strategy reports
+│   ├── mcp_server.py            # Casper MCP server — live on-chain state as MCP tools
+│   ├── mcp_test.py              # MCP tools self-test (no MCP client required)
 │   ├── x402.py                  # Real x402 client/verifier (ed25519) + in-process self-test
 │   ├── x402_facilitator.py      # Runnable x402-gated data server (serves live FRED price)
 │   ├── requirements.txt         # Python deps (aiohttp, pycspr, dotenv, gemini, cryptography)
@@ -513,7 +555,7 @@ Submitted to: **Casper Agentic Buildathon 2026 — Innovation Track**
 |-----------|---------------|
 | Technical Execution | 4 Odra contracts, 15 tests (incl. full e2e pipeline), 3 real CPIs + 3 AI agents |
 | Innovation | First Indonesian palm oil RWA on Casper |
-| Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + x402 |
+| Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + x402 + **Casper MCP server** |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims enforced cross-contract |
 | Real-World Applicability | $30B CPO market, real mill data |
