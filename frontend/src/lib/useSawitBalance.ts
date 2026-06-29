@@ -14,7 +14,10 @@ type FtOwnership = {
 // holders we fall back to their REAL on-chain balance (read via the read_state
 // bridge / token.balance_of). Keyed by public key.
 const KNOWN_SAWIT: Record<string, number> = {
+  // user's wallet (account 1)
   '0202111d3b480feaea33ce6839d087d9f685a3348fba27008221f52dfe2034656adc': 100,
+  // deployer — minted 2,260,000 then transferred 100 to account 1
+  '016410a22de86e0de234120f29272d5b1096caa60b3cf8a3b396d49e5399ad5428': 2_259_900,
 };
 
 /**
