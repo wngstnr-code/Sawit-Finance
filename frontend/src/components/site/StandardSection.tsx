@@ -65,7 +65,7 @@ export default function StandardSection() {
       >
         <div className="flex items-center gap-2 border-b border-line px-5 py-3">
           <span className="font-mono text-[12px] text-faint">
-            sawitfinance.app / dashboard
+            Protocol dashboard
           </span>
         </div>
         <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
