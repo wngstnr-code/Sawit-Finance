@@ -1,0 +1,11 @@
+[[contracts]]
+fqn = "production_vault::production_vault::SawitProductionVault"
+
+[[contracts]]
+fqn = "sawit_token::sawit_token::SawitToken"
+
+[[contracts]]
+fqn = "token_minter::token_minter::SawitMinter"
+
+[[contracts]]
+fqn = "yield_distributor::yield_distributor::SawitYieldDistributor"

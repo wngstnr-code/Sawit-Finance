@@ -1,0 +1,14 @@
+{
+  "name": "sawit-fi",
+  "version": "0.1.0",
+  "description": "Sawit Finance — Tokenized Indonesian Palm Oil (CPO) RWA on Casper Network",
+  "scripts": {
+    "build": "cargo build --release",
+    "test": "cargo test",
+    "agent:oracle": "python3 agents/oracle_agent.py",
+    "agent:router": "python3 agents/yield_router.py",
+    "agent:analyst": "python3 agents/market_analyst_agent.py",
+    "x402:facilitator": "python3 agents/x402_facilitator.py",
+    "x402:selftest": "python3 agents/x402.py"
+  }
+}
