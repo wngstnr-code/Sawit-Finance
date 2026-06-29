@@ -27,7 +27,9 @@ export function buildClaimTransaction(publicKeyHex: string, epochNumber: number)
     )
     .from(PublicKey.fromHex(publicKeyHex))
     .chainName(NETWORK.name)
-    // ~3 CSPR gas budget — a CPI contract call (claim → vault KYC check).
-    .payment(3_000_000_000)
+    // 10 CSPR gas budget — claim_yield does a CPI to the vault (KYC check),
+    // a CSPR transfer, and an event emit, so it needs more than a trivial call.
+    // (3 CSPR ran out of gas; the on-chain loop used 8 — 10 leaves margin.)
+    .payment(10_000_000_000)
     .build();
 }
