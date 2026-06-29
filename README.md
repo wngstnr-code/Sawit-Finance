@@ -107,6 +107,8 @@ Three AI agents run the protocol autonomously — this is the heart of the Build
 | **Yield Router** | Monitors CPO price, auto-triggers CSPR yield distribution when a threshold is met | Rule-based |
 | **Market Analyst** | Reads all 4 contracts, runs Gemini strategy analysis, **autonomously adjusts GORR on-chain** | Gemini 2.5 Flash |
 
+**Every agent writes on-chain — for real (no simulated hashes).** Each agent signs and broadcasts its decision as a live Casper transaction: the Oracle records verified production ([`2e6e00b1…`](https://testnet.cspr.live/transaction/2e6e00b168066072d960184fdee4300c46a946dbb3b6b6b141c8fcb8166e8ac6)), the Yield Router funds a distribution epoch ([`3cb6b496…`](https://testnet.cspr.live/transaction/3cb6b496392c88b80e2ebe64820d2858b78e948072f963ac52b9f122438856b8)), and the Market Analyst tunes GORR ([`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0)). Two agents are **LLM-driven** (Oracle, Market Analyst — Gemini 2.5 Flash); the Yield Router is a **rule-based trigger**. All three act through the same signed-livenet path.
+
 **Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded — here's an actual agent-driven GORR change on Testnet: [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (the agent moved GORR 510→500 bps). **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band — a hallucinated recommendation can never harm holders.
 
 **Gemini reasoning gate.** Before data hits the chain, the Oracle Agent passes all 3 source readings to Gemini, which flags seasonal anomalies / suspicious spikes and can veto a submission (`"recommendation": "REJECT"` blocks the epoch regardless of the statistical score).
@@ -208,7 +210,7 @@ Deploy to Testnet (Odra livenet backend) and reproducible-build verification are
 contracts/   production-vault · sawit-token · token-minter · yield-distributor  (Odra/Rust)
 agents/      oracle · yield_router · market_analyst · x402 · x402_settle · mcp_server
 e2e/         full_flow.rs — production → mint → KYC → claim across all 4 contracts
-deploy/      livenet deploy + record/mint/fund/claim/set_gorr bins + read_state/read_balance bridges
+deploy/      livenet deploy + agent-driven bins (record/fund/set_gorr/mint/claim/set_claimable) + read_state/read_balance bridges
 frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live reads & claims)
 ```
 

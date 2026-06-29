@@ -25,18 +25,20 @@ x402 Integration:
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
+import re
+import subprocess
 import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import aiohttp
 import google.generativeai as genai
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 
 from cpo_price import fetch_palm_oil_price, FEED_LABEL
 
@@ -50,6 +52,12 @@ except ImportError:
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("sawit-oracle")
+
+# The Oracle's on-chain write goes through the `record` livenet bin (signs with
+# the oracle/authority key), mirroring how the Market Analyst writes GORR.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+RECORD_BIN = os.getenv("RECORD_BIN", str(REPO_ROOT / "target" / "release" / "record"))
+LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
 
 # ─── CONFIG ───
 
@@ -411,39 +419,51 @@ async def post_to_casper(
         "epoch_timestamp": {"cl_type": "U64", "parsed": data.epoch_timestamp_ms},
     }
 
-    # In production: use casper-client-py or pycspr SDK to:
-    # 1. Build StoredContractByHash deploy
-    # 2. Sign with ORACLE_AGENT_SECRET_KEY
-    # 3. Submit via CSPR.cloud /deploys endpoint
-    #
-    # Reference: docs.cspr.cloud/agentic-tools/mcp-server
-    #
-    # deploy = {
-    #     "deploy": {
-    #         "header": {...},
-    #         "payment": {"ModuleBytes": {"module_bytes": "", "args": [["amount", "1000000000"]]}},
-    #         "session": {
-    #             "StoredContractByHash": {
-    #                 "hash": PRODUCTION_VAULT_CONTRACT,
-    #                 "entry_point": "record_production",
-    #                 "args": deploy_args,
-    #             }
-    #         },
-    #         "approvals": [{"signer": oracle_pubkey, "signature": sign(...)}],
-    #     }
-    # }
-    #
-    # async with session.put(f"{CSPR_CLOUD_API}/deploys", json=deploy) as resp:
-    #     result = await resp.json()
-    #     return result["deploy_hash"]
+    # Real on-chain write: sign and broadcast record_production() on the vault via
+    # the `record` livenet bin, passing the values this agent reasoned about. The
+    # bin prints the executed transaction hash — that's the oracle's post, on cspr.live.
+    if not os.path.exists(RECORD_BIN):
+        log.error(
+            f"[CASPER] record bin not found at {RECORD_BIN} — build it: "
+            "cargo build -p sawit-deploy --bin record --features livenet --release"
+        )
+        return ""
 
-    # Simulate for demo
-    mock_deploy_hash = hashlib.sha256(
-        f"{data.epoch_label}{data.tons_cpo}{int(time.time())}".encode()
-    ).hexdigest()
+    env = {
+        **os.environ,
+        **dotenv_values(LIVENET_ENV_FILE),
+        "RECORD_EPOCH_LABEL": data.epoch_label,
+        "RECORD_TONS_CPO": str(data.tons_cpo),
+        "RECORD_REVENUE_USD": str(data.revenue_usd_cents),
+        "RECORD_DAILY_OUTPUT_TON": str(data.daily_output_ton),
+        "RECORD_OER_PCT": str(data.oer_pct),
+        "RECORD_CPO_PRICE_CENTS": str(data.cpo_price_cents),
+        "RECORD_ESTATE_COUNT": str(data.estate_count),
+        "RECORD_ACTIVE_MILLS": str(data.active_mills),
+        "RECORD_VALIDATION_SCORE": str(data.validation_score),
+        "RECORD_DATA_SOURCE": data.data_source,
+    }
+    try:
+        proc = subprocess.run(
+            [RECORD_BIN], capture_output=True, text=True, env=env, timeout=180
+        )
+    except subprocess.TimeoutExpired:
+        log.error("[CASPER] record bin timed out before confirmation")
+        return ""
 
-    log.info(f"[CASPER] Deploy submitted! Hash: {mock_deploy_hash[:16]}...")
-    return mock_deploy_hash
+    if "RECORD_OK" not in proc.stdout:
+        log.error(f"[CASPER] on-chain record failed (exit {proc.returncode}): "
+                  f"{(proc.stderr or proc.stdout)[-400:]}")
+        return ""
+
+    m = re.search(r'Transaction "([0-9a-f]{64})"', proc.stdout)
+    deploy_hash = m.group(1) if m else ""
+    if deploy_hash:
+        log.info(f"[CASPER] ✅ Recorded on-chain — tx {deploy_hash}")
+        log.info(f"[CASPER]    https://testnet.cspr.live/transaction/{deploy_hash}")
+    else:
+        log.info("[CASPER] ✅ Recorded on-chain (tx hash not parsed from output)")
+    return deploy_hash
 
 
 # ─── MAIN ORACLE LOOP ───

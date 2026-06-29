@@ -23,8 +23,18 @@ fn main() {
 
     const DIST: &str = "hash-1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9";
 
-    // 100 CSPR distribution pool for this epoch.
-    let pool: U512 = U512::from(100_000_000_000u64); // motes (100 CSPR)
+    // Distribution pool / trigger the Yield Router decided (env-overridable so the
+    // agent funds the amount from its own plan; default 100 CSPR for a manual run).
+    let pool_motes: u64 = std::env::var("FUND_AMOUNT_MOTES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100_000_000_000u64);
+    let trigger_cents: u64 = std::env::var("FUND_TRIGGER_CENTS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(82_500);
+    let epoch_label = std::env::var("FUND_EPOCH_LABEL").unwrap_or_else(|_| "Jun-2026".into());
+    let pool: U512 = U512::from(pool_motes);
 
     let env = odra_casper_livenet_env::env();
     let deployer = env.get_account(0);
@@ -43,13 +53,13 @@ fn main() {
         cur
     } else {
         // 1. Create the distribution epoch (claim_deadline = now + 90 days).
-        println!("\nCreating distribution epoch 'Jun-2026'...");
+        println!("\nCreating distribution epoch '{epoch_label}'...");
         env.set_gas(6_000_000_000);
         dist.create_epoch(
-            "Jun-2026".to_string(),
-            pool,    // total_distribution_cspr
-            1,       // total_eligible_holders
-            82_500,  // cpo_trigger_price_cents ($825.00/ton)
+            epoch_label.clone(),
+            pool,          // total_distribution_cspr
+            1,             // total_eligible_holders
+            trigger_cents, // cpo_trigger_price_cents
         );
         let n = dist.get_current_epoch();
         println!("Created epoch #{n}");
@@ -71,5 +81,7 @@ fn main() {
         println!("Is funded            : {}", e.is_funded);
         println!("Claim deadline (ms)  : {}", e.claim_deadline);
     }
+    // Machine-readable marker so the Yield Router can confirm the write landed.
+    println!("FUND_OK {{\"epoch\":{epoch_no},\"motes\":{pool_motes}}}");
     println!("\n✅ Distribution epoch {epoch_no} created and funded.");
 }

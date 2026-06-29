@@ -13,7 +13,7 @@ type Bal = { balance: number; claimable_motes: string };
 // isn't available (e.g. Vercel serverless). Keyed by account-hash hex; values are
 // genuine on-chain figures captured from the chain.
 const BALANCE_SNAPSHOT: Record<string, Bal> = {
-  // account 1 — holds 100 SAWIT, 25 CSPR claimable on epoch 2
+  // account 1 — holds 100 SAWIT, 25 CSPR claimable on epoch 3 (Yield-Router-funded)
   e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe: {
     balance: 100,
     claimable_motes: '25000000000',

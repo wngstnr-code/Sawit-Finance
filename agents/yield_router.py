@@ -27,13 +27,16 @@ import asyncio
 import json
 import logging
 import os
+import re
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import aiohttp
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 
 # Real x402 client (graceful if cryptography isn't installed)
 try:
@@ -45,6 +48,12 @@ except ImportError:
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("sawit-yield-router")
+
+# The Router's on-chain write goes through the `fund` livenet bin (create_epoch +
+# payable fund_epoch), mirroring how the other agents write to chain.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+FUND_BIN = os.getenv("FUND_BIN", str(REPO_ROOT / "target" / "release" / "fund"))
+LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
 
 # ─── CONFIG ───
 
@@ -223,53 +232,50 @@ async def submit_distribution(
     """
     Submit the distribution plan to Casper Testnet.
 
-    Calls in sequence:
-      1. YieldDistributor.create_epoch()
-      2. YieldDistributor.set_claimable_batch()
-      3. YieldDistributor.fund_epoch()
-
-    The Yield Router Agent signs and submits these as Casper deploys.
+    Real on-chain write: the router signs and broadcasts the distribution on
+    Casper Testnet via the `fund` livenet bin — create_epoch() + a payable
+    fund_epoch() that attaches the CSPR pool. The bin prints the executed
+    transaction hash; per-holder pro-rata claimable is then posted by the
+    operator (the off-chain-computed split documented in the trust model).
     """
-    deploy_hashes = []
-    log.info(f"[CASPER] Submitting distribution for epoch {plan.epoch_label}...")
+    log.info(f"[CASPER] Submitting distribution for epoch {plan.epoch_label} "
+             f"({plan.total_cspr_motes / 1e9:g} CSPR)...")
 
-    # 1. create_epoch()
-    log.info("[CASPER] Step 1/3: create_epoch()")
-    # deploy_hash_1 = await submit_deploy(session, YIELD_DISTRIBUTOR_CONTRACT, "create_epoch", {
-    #     "epoch_label": plan.epoch_label,
-    #     "total_distribution_cspr": plan.total_cspr_motes,
-    #     "total_eligible_holders": plan.total_holders,
-    #     "cpo_trigger_price_cents": plan.trigger_price_cents,
-    # })
-    deploy_hash_1 = f"create-epoch-{int(time.time())}"
-    deploy_hashes.append(deploy_hash_1)
-    await asyncio.sleep(0.5)
+    if not os.path.exists(FUND_BIN):
+        log.error(
+            f"[CASPER] fund bin not found at {FUND_BIN} — build it: "
+            "cargo build -p sawit-deploy --bin fund --features livenet --release"
+        )
+        return []
 
-    # 2. set_claimable_batch() — one call with all holder addresses and amounts
-    log.info("[CASPER] Step 2/3: set_claimable_batch()")
-    holders_list = list(plan.per_holder_cspr_motes.keys())
-    amounts_list = list(plan.per_holder_cspr_motes.values())
-    # deploy_hash_2 = await submit_deploy(session, YIELD_DISTRIBUTOR_CONTRACT, "set_claimable_batch", {
-    #     "epoch_number": 1,
-    #     "holders": holders_list,
-    #     "amounts": amounts_list,
-    # })
-    deploy_hash_2 = f"set-claimable-{int(time.time())}"
-    deploy_hashes.append(deploy_hash_2)
-    await asyncio.sleep(0.5)
+    env = {
+        **os.environ,
+        **dotenv_values(LIVENET_ENV_FILE),
+        "FUND_EPOCH_LABEL": plan.epoch_label,
+        "FUND_AMOUNT_MOTES": str(plan.total_cspr_motes),
+        "FUND_TRIGGER_CENTS": str(plan.trigger_price_cents),
+    }
+    try:
+        proc = subprocess.run(
+            [FUND_BIN], capture_output=True, text=True, env=env, timeout=240
+        )
+    except subprocess.TimeoutExpired:
+        log.error("[CASPER] fund bin timed out before confirmation")
+        return []
 
-    # 3. fund_epoch()
-    log.info("[CASPER] Step 3/3: fund_epoch()")
-    # deploy_hash_3 = await submit_deploy(session, YIELD_DISTRIBUTOR_CONTRACT, "fund_epoch", {
-    #     "epoch_number": 1,
-    # })
-    deploy_hash_3 = f"fund-epoch-{int(time.time())}"
-    deploy_hashes.append(deploy_hash_3)
+    if "FUND_OK" not in proc.stdout:
+        log.error(f"[CASPER] on-chain distribution failed (exit {proc.returncode}): "
+                  f"{(proc.stderr or proc.stdout)[-400:]}")
+        return []
 
-    log.info(f"[CASPER] ✅ Distribution live for epoch {plan.epoch_label}!")
-    log.info(f"[CASPER] Deploys: {', '.join(d[:16] for d in deploy_hashes)}...")
-
-    return deploy_hashes
+    m = re.search(r'Transaction "([0-9a-f]{64})"', proc.stdout)
+    deploy_hash = m.group(1) if m else ""
+    if deploy_hash:
+        log.info(f"[CASPER] ✅ Distribution funded on-chain — tx {deploy_hash}")
+        log.info(f"[CASPER]    https://testnet.cspr.live/transaction/{deploy_hash}")
+    else:
+        log.info("[CASPER] ✅ Distribution funded on-chain (tx hash not parsed)")
+    return [deploy_hash] if deploy_hash else []
 
 
 # ─── TRIGGER LOGIC ───
