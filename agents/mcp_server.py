@@ -34,6 +34,7 @@ import io
 import json
 import os
 import subprocess
+import threading
 import time
 import urllib.request
 
@@ -92,21 +93,75 @@ def _run_bridge(bin_path: str, extra_env: dict, marker: str) -> dict:
     raise RuntimeError(f"{marker} not found in bridge output")
 
 
-def _state(refresh: bool = False) -> dict:
-    """Protocol state. Serves the cached on-chain read for fast tool calls;
-    refresh=True forces a fresh ~60–90s live read via the bridge."""
-    if not refresh:
-        cached = _mem.get("state")
-        if cached and time.time() - cached["at"] < 120:
-            return cached["v"]
-        if os.path.exists(STATE_CACHE):
-            with open(STATE_CACHE) as f:
-                v = json.load(f).get("state", {})
-            _mem["state"] = {"v": v, "at": time.time()}
-            return v
+_REFRESH_TTL = 90          # seconds — serve cache instantly, refresh in background when older
+_refresh_lock = threading.Lock()
+_refreshing = False
+
+
+def _live_read() -> dict:
+    """Read all four contracts live, update the in-memory cache, and persist to the
+    shared `.state-cache.json` file (same format the frontend /api/state uses)."""
     v = _run_bridge(READ_STATE_BIN, {}, "SAWIT_STATE_JSON")
     _mem["state"] = {"v": v, "at": time.time()}
+    try:
+        with open(STATE_CACHE, "w") as f:
+            json.dump({"state": v, "at": int(time.time() * 1000)}, f)
+    except OSError:
+        pass
     return v
+
+
+def _refresh_in_background() -> None:
+    """Kick off one live read in a daemon thread (no-op if one is already running)."""
+    global _refreshing
+    with _refresh_lock:
+        if _refreshing:
+            return
+        _refreshing = True
+
+    def _worker() -> None:
+        global _refreshing
+        try:
+            _live_read()
+        except Exception:
+            pass
+        finally:
+            with _refresh_lock:
+                _refreshing = False
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _state(refresh: bool = False) -> dict:
+    """Protocol state. Serves the cached on-chain read instantly for snappy tool
+    calls and self-refreshes in the background once the cache passes _REFRESH_TTL;
+    refresh=True forces a fresh ~60–90s live read via the bridge."""
+    if refresh:
+        return _live_read()
+
+    # In-memory cache (fast path) — serve now, refresh in the background if stale.
+    cached = _mem.get("state")
+    if cached:
+        if time.time() - cached["at"] > _REFRESH_TTL:
+            _refresh_in_background()
+        return cached["v"]
+
+    # Fall back to the shared cache file; refresh in the background if stale.
+    if os.path.exists(STATE_CACHE):
+        try:
+            with open(STATE_CACHE) as f:
+                blob = json.load(f)
+            v = blob.get("state", {})
+            at = blob.get("at", 0) / 1000  # file stores ms
+            _mem["state"] = {"v": v, "at": at}
+            if time.time() - at > _REFRESH_TTL:
+                _refresh_in_background()
+            return v
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    # No cache at all — do the (slow) first live read synchronously.
+    return _live_read()
 
 
 def _account_hash(public_key_hex: str) -> str:
