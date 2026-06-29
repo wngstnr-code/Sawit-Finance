@@ -17,12 +17,13 @@ What is REAL here:
   - Replay protection via server-issued nonces
   - Amount / recipient / resource binding inside the signed message
 
-What still needs a funded key + deploy (the "settlement" step):
-  - Broadcasting the authorized transfer on Casper Testnet. The signed proof here
-    IS the authorization; a production facilitator submits it on-chain. In demo
-    mode the facilitator verifies the proof without broadcasting.
+Settlement (moving the CSPR on-chain) is LIVE too — see `x402_settle.py`, which
+runs this handshake and then broadcasts a real native CSPR transfer on Casper
+Testnet for the payment, verifying it executed before serving the data. This
+module is the protocol/crypto layer; that script is the on-chain settlement layer.
 
 Run the in-process self-test:   python agents/x402.py
+Run the live on-chain settlement: python agents/x402_settle.py
 """
 
 import base64
@@ -233,8 +234,9 @@ class X402Verifier:
 
         # Accept: burn the nonce so it can't be replayed
         self._spent_nonces.add(nonce)
-        # In production the facilitator would now submit the authorized transfer
-        # on Casper Testnet (payTo receives `amount` motes from `from_pk`).
+        # The proof is now authorized; settlement (broadcasting the CSPR transfer
+        # so payTo receives `amount` motes from `from_pk`) runs on-chain in
+        # x402_settle.py and is verified before the data is served.
         return True, "ok"
 
 

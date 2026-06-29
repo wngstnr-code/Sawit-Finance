@@ -84,9 +84,12 @@ python agents/oracle_agent.py
 
 # Or just verify the protocol in-process (real ed25519, no network):
 python agents/x402.py     # → 5 handshake checks: valid / replay / underpay / forged / wrong-resource
+
+# Live on-chain settlement — runs the handshake then moves real CSPR on Testnet:
+python agents/x402_settle.py   # → 402 → signed proof → native transfer → on-chain verify
 ```
 
-> **What's real vs. pending:** the full handshake + cryptographic payment authorization run today. On-chain *settlement* (the facilitator broadcasting the authorized transfer) activates once the agent has a funded Testnet key. Note: KPBN/MPOB don't natively speak x402, so the gated endpoints are Sawit Finance's own facilitator standing in for them — an honest prototype of agent-pays-for-data commerce.
+> **Settlement is live on-chain.** `agents/x402_settle.py` runs the handshake and then **broadcasts a real native CSPR transfer on Casper Testnet** for the payment, verifying it executed before the gated data is served — the same funded ed25519 key signs the x402 proof and owns the on-chain funds. Example settlement: [`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856) (2.5 CSPR, Testnet's native-transfer minimum; true sub-cent micropayments would batch on a payment-channel contract — the settlement mechanism is identical). Note: KPBN/MPOB don't natively speak x402, so the gated endpoints are Sawit Finance's own facilitator standing in for them — an honest prototype of agent-pays-for-data commerce.
 
 ### Casper MCP Server (Model Context Protocol)
 Sawit Finance ships a real **MCP server** (`agents/mcp_server.py`) that exposes the
@@ -198,6 +201,7 @@ Sawit-Finance/
 │   ├── mcp_server.py            # Casper MCP server — live on-chain state as MCP tools
 │   ├── mcp_test.py              # MCP tools self-test (no MCP client required)
 │   ├── x402.py                  # Real x402 client/verifier (ed25519) + in-process self-test
+│   ├── x402_settle.py           # Live x402 settlement — broadcasts a real CSPR transfer on Testnet
 │   ├── x402_facilitator.py      # Runnable x402-gated data server (serves live FRED price)
 │   ├── requirements.txt         # Python deps (aiohttp, pycspr, dotenv, gemini, cryptography)
 │   └── .env.example             # Config template (incl. GEMINI_API_KEY, X402_LIVE)
