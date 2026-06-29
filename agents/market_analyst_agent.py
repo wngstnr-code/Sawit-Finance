@@ -27,8 +27,7 @@ import asyncio
 import json
 import logging
 import os
-import asyncio
-import json
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,6 +52,9 @@ CSPR_CLOUD_API = "https://api.testnet.cspr.cloud"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READ_STATE_BIN = os.getenv(
     "READ_STATE_BIN", str(REPO_ROOT / "target" / "release" / "read_state")
+)
+SET_GORR_BIN = os.getenv(
+    "SET_GORR_BIN", str(REPO_ROOT / "target" / "release" / "set_gorr")
 )
 LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
 
@@ -420,32 +422,38 @@ async def apply_gorr_onchain(
 
     log.info(f"[AUTONOMY] 🤖 Autonomously updating GORR {current_gorr} → {safe_gorr} bps on-chain...")
 
-    # On-chain call: TokenMinter.update_config(new_token_rate=None, new_gorr_bps=safe_gorr)
-    # Submitted as a signed Casper deploy via CSPR.cloud, same pattern as the other agents.
-    #
-    # deploy_args = {
-    #     "new_token_rate": {"cl_type": {"Option": "U64"}, "parsed": None},
-    #     "new_gorr_bps":   {"cl_type": {"Option": "U32"}, "parsed": safe_gorr},
-    # }
-    # deploy = build_stored_contract_deploy(
-    #     contract_hash=TOKEN_MINTER_CONTRACT,
-    #     entry_point="update_config",
-    #     args=deploy_args,
-    #     signer_key=MARKET_ANALYST_SECRET_KEY,
-    # )
-    # async with session.put(f"{CSPR_CLOUD_API}/deploys", json=deploy,
-    #                        headers={"Authorization": CSPR_CLOUD_API_KEY}) as resp:
-    #     result = await resp.json()
-    #     return result["deploy_hash"]
-    #
-    # NOTE: the Market Analyst's key must be the TokenMinter authority (or a
-    # delegated config-manager) for update_config to pass its auth check.
+    # Real on-chain write: the agent signs and broadcasts
+    # TokenMinter.update_config(new_gorr_bps=safe_gorr) via the `set_gorr` livenet
+    # binary (the deployer key is the minter's authority). The binary prints the
+    # executed transaction hash — that hash is the agent's decision, on cspr.live.
+    if not os.path.exists(SET_GORR_BIN):
+        log.error(
+            f"[AUTONOMY] set_gorr bin not found at {SET_GORR_BIN} — build it: "
+            "cargo build -p sawit-deploy --bin set_gorr --features livenet --release"
+        )
+        return None
 
-    import hashlib
-    deploy_hash = hashlib.sha256(
-        f"update_config{safe_gorr}{int(datetime.now(timezone.utc).timestamp())}".encode()
-    ).hexdigest()
-    log.info(f"[AUTONOMY] ✅ GORR updated on-chain — deploy {deploy_hash[:16]}...")
+    env = {**os.environ, **dotenv_values(LIVENET_ENV_FILE), "SET_GORR_BPS": str(safe_gorr)}
+    try:
+        proc = subprocess.run(
+            [SET_GORR_BIN], capture_output=True, text=True, env=env, timeout=180
+        )
+    except subprocess.TimeoutExpired:
+        log.error("[AUTONOMY] set_gorr timed out before confirmation")
+        return None
+
+    if "GORR_UPDATE_OK" not in proc.stdout:
+        log.error(f"[AUTONOMY] on-chain GORR update failed (exit {proc.returncode}): "
+                  f"{(proc.stderr or proc.stdout)[-400:]}")
+        return None
+
+    m = re.search(r'Transaction "([0-9a-f]{64})"', proc.stdout)
+    deploy_hash = m.group(1) if m else None
+    if deploy_hash:
+        log.info(f"[AUTONOMY] ✅ GORR updated on-chain — tx {deploy_hash}")
+        log.info(f"[AUTONOMY]    https://testnet.cspr.live/transaction/{deploy_hash}")
+    else:
+        log.info("[AUTONOMY] ✅ GORR updated on-chain (tx hash not parsed from output)")
     return deploy_hash
 
 

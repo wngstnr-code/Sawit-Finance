@@ -39,6 +39,10 @@ path = "src/demo.rs"
 name = "read_balance"
 path = "src/read_balance.rs"
 
+[[bin]]
+name = "set_gorr"
+path = "src/set_gorr.rs"
+
 # The livenet backend is optional + feature-gated so that `cargo test` / `cargo build`
 # for the rest of the workspace never pulls it in. Real deploys use --features livenet.
 [features]

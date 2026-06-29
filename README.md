@@ -11,7 +11,8 @@ Built for the **Casper Agentic Buildathon 2026**.
 > ### ✅ Verify it yourself in 30 seconds
 > - **🟢 Use it:** [sawitfinance.xyz](https://sawitfinance.xyz) — connect a Casper wallet and claim real CSPR yield
 > - **⛓️ See the loop on-chain:** KYC-gated yield claim [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) on cspr.live (record→mint→fund→claim — [full loop below](#live-on-casper-testnet--the-full-loop-executed-on-chain))
-> - **🤖 Agentic AI:** [Casper MCP server](#the-agentic-layer) (7 live-state tools) + x402 **live settlement** [`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856) — a real CSPR transfer for a paid agent request
+> - **🤖 Agentic write:** an autonomous agent's GORR decision, broadcast on-chain [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (read→reason→write, with safety rails)
+> - **🔌 Toolkit:** [Casper MCP server](#the-agentic-layer) (7 live-state tools) + x402 **live settlement** [`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856) — a real CSPR transfer for a paid agent request
 
 ---
 
@@ -106,7 +107,7 @@ Three AI agents run the protocol autonomously — this is the heart of the Build
 | **Yield Router** | Monitors CPO price, auto-triggers CSPR yield distribution when a threshold is met | Rule-based |
 | **Market Analyst** | Reads all 4 contracts, runs Gemini strategy analysis, **autonomously adjusts GORR on-chain** | Gemini 2.5 Flash |
 
-**Closed-loop autonomy.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it calls `TokenMinter.update_config()` to tune GORR from its own analysis. **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band — a hallucinated recommendation can never harm holders.
+**Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded — here's an actual agent-driven GORR change on Testnet: [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (the agent moved GORR 510→500 bps). **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band — a hallucinated recommendation can never harm holders.
 
 **Gemini reasoning gate.** Before data hits the chain, the Oracle Agent passes all 3 source readings to Gemini, which flags seasonal anomalies / suspicious spikes and can veto a submission (`"recommendation": "REJECT"` blocks the epoch regardless of the statistical score).
 
@@ -207,7 +208,7 @@ Deploy to Testnet (Odra livenet backend) and reproducible-build verification are
 contracts/   production-vault · sawit-token · token-minter · yield-distributor  (Odra/Rust)
 agents/      oracle · yield_router · market_analyst · x402 · x402_settle · mcp_server
 e2e/         full_flow.rs — production → mint → KYC → claim across all 4 contracts
-deploy/      livenet deploy + record/mint/fund/claim bins + read_state/read_balance bridges
+deploy/      livenet deploy + record/mint/fund/claim/set_gorr bins + read_state/read_balance bridges
 frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live reads & claims)
 ```
 
