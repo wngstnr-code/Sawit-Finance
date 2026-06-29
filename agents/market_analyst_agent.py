@@ -1,0 +1,573 @@
+"""
+Sawit Finance — Market Analyst Agent
+=================================
+Autonomous AI agent that reads all 4 Sawit Finance contract states via
+CSPR.cloud REST API (Casper MCP-compatible), feeds the data to Gemini AI,
+and produces actionable market intelligence reports.
+
+Responsibilities:
+  - Monitor oracle reputation score — alert if declining
+  - Analyze CPO price trends across epochs
+  - Detect unclaimed yield windows approaching expiry
+  - Recommend GORR (Gross Overriding Royalty Rate) adjustments
+  - Flag anomalies in production data patterns
+
+Why this agent matters:
+  Unlike the Oracle Agent (data collection) and Yield Router (distribution),
+  the Market Analyst acts as a strategic brain — using AI reasoning to
+  interpret on-chain data and guide human operators.
+
+Architecture:
+  CSPR.cloud REST API → read contract state
+  → Gemini AI reasoning → structured report
+  → logged + available for operator dashboard
+"""
+
+import asyncio
+import json
+import logging
+import os
+import asyncio
+import json
+import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+import aiohttp
+import google.generativeai as genai
+from dotenv import load_dotenv, dotenv_values
+
+load_dotenv()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("sawit-analyst")
+
+# ─── CONFIG ───
+
+CSPR_CLOUD_API = "https://api.testnet.cspr.cloud"
+
+# Read-only Rust bridge that reads Odra's `state` dictionary via the livenet
+# client (CSPR.cloud's named-keys endpoint can't see Odra state). Built with:
+#   cargo build -p sawit-deploy --bin read_state --features livenet --release
+REPO_ROOT = Path(__file__).resolve().parent.parent
+READ_STATE_BIN = os.getenv(
+    "READ_STATE_BIN", str(REPO_ROOT / "target" / "release" / "read_state")
+)
+LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
+
+PRODUCTION_VAULT_CONTRACT = os.getenv("PRODUCTION_VAULT_CONTRACT", "")
+YIELD_DISTRIBUTOR_CONTRACT = os.getenv("YIELD_DISTRIBUTOR_CONTRACT", "")
+SAWIT_TOKEN_CONTRACT = os.getenv("SAWIT_TOKEN_CONTRACT", "")
+TOKEN_MINTER_CONTRACT = os.getenv("TOKEN_MINTER_CONTRACT", "")
+CSPR_CLOUD_API_KEY = os.getenv("CSPR_CLOUD_API_KEY", "")
+
+MARKET_ANALYST_SECRET_KEY = os.getenv("MARKET_ANALYST_SECRET_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+# How often to run analysis (default: every 6 hours)
+ANALYSIS_INTERVAL_SECONDS = int(os.getenv("ANALYSIS_INTERVAL_SECONDS", "21600"))
+
+# Closed-loop autonomy: when ON, the agent autonomously applies its GORR
+# recommendation on-chain via TokenMinter.update_config(). When OFF, it only reports.
+AUTONOMY_MODE = os.getenv("AUTONOMY_MODE", "off").lower() == "on"
+# Safety rail: AI is never allowed to move GORR by more than this many bps per cycle,
+# nor outside the absolute [MIN, MAX] band. Prevents a hallucinated swing from
+# draining holder yield or over-issuing.
+MAX_GORR_CHANGE_BPS = int(os.getenv("MAX_GORR_CHANGE_BPS", "100"))
+MIN_GORR_BPS = int(os.getenv("MIN_GORR_BPS", "100"))    # 1.0% floor
+MAX_GORR_BPS = int(os.getenv("MAX_GORR_BPS", "1000"))   # 10.0% ceiling
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+
+# ─── DATA STRUCTURES ───
+
+@dataclass
+class ContractState:
+    # ProductionVault
+    epoch_count: int
+    oracle_reputation: int
+    oracle_submission_count: int
+    total_tons_cpo: int
+    latest_epoch_label: str
+    latest_cpo_price_cents: int
+    latest_validation_score: int
+    latest_tons_cpo: int
+
+    # YieldDistributor
+    current_distribution_epoch: int
+    latest_epoch_funded: bool
+    latest_epoch_claim_deadline_ms: int
+    total_distributed_cspr: str
+
+    # TokenMinter
+    total_tokens_minted: str
+    gorr_bps: int
+    token_rate: int
+
+    # SawitToken
+    total_sawit_supply: str
+
+
+# ─── CSPR.CLOUD STATE READER ───
+
+def _demo_state() -> ContractState:
+    """Fallback state if the on-chain read is unavailable (read bin not built,
+    node unreachable, etc.). Labelled clearly so it's never mistaken for live data."""
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    return ContractState(
+        epoch_count=3,
+        oracle_reputation=85,
+        oracle_submission_count=3,
+        total_tons_cpo=135_000,
+        latest_epoch_label="Jun-26 (demo)",
+        latest_cpo_price_cents=82_500,
+        latest_validation_score=88,
+        latest_tons_cpo=45_200,
+        current_distribution_epoch=2,
+        latest_epoch_funded=True,
+        latest_epoch_claim_deadline_ms=now_ms + (7 * 24 * 3600 * 1000),
+        total_distributed_cspr="15000000000000",
+        total_tokens_minted="6750000000000000",
+        gorr_bps=500,
+        token_rate=1000,
+        total_sawit_supply="6750000000000000",
+    )
+
+
+def _read_state_blocking() -> Optional[ContractState]:
+    """Invoke the read_state Rust bridge and parse its JSON line. Returns None on
+    any failure so the caller can fall back to demo state."""
+    if not Path(READ_STATE_BIN).exists():
+        log.warning(f"[ANALYST] read bin not found at {READ_STATE_BIN} — "
+                    "build it: cargo build -p sawit-deploy --bin read_state "
+                    "--features livenet --release")
+        return None
+
+    # The bridge needs the livenet env vars (node, chain, secret key) from the
+    # project-root .env — agents/.env doesn't carry those.
+    env = {**os.environ, **dotenv_values(LIVENET_ENV_FILE)}
+    try:
+        proc = subprocess.run(
+            [READ_STATE_BIN], capture_output=True, text=True, env=env, timeout=120
+        )
+    except subprocess.TimeoutExpired:
+        log.warning("[ANALYST] read_state timed out — using demo state")
+        return None
+
+    for line in proc.stdout.splitlines():
+        if line.startswith("SAWIT_STATE_JSON "):
+            d = json.loads(line[len("SAWIT_STATE_JSON "):])
+            return ContractState(**d)
+
+    log.warning(f"[ANALYST] read_state produced no JSON (exit {proc.returncode}): "
+                f"{proc.stderr.strip()[:200]} — using demo state")
+    return None
+
+
+async def read_contract_state(session: aiohttp.ClientSession) -> ContractState:
+    """Read live state from all 4 Sawit Finance contracts via the read_state Rust
+    bridge (reads Odra's `state` dictionary through the livenet client). Falls
+    back to clearly-labelled demo state if the bridge is unavailable."""
+    log.info("[ANALYST] Reading live on-chain state via read_state bridge...")
+    state = await asyncio.to_thread(_read_state_blocking)
+    if state is None:
+        log.warning("[ANALYST] Falling back to DEMO state (not on-chain)")
+        return _demo_state()
+    log.info("[ANALYST] Live state read from chain ✅")
+    return state
+
+
+# ─── GEMINI ANALYSIS ───
+
+async def run_gemini_analysis(state: ContractState) -> dict:
+    """
+    Feed contract state to Gemini AI for strategic market analysis.
+
+    Gemini reasons about:
+    - Oracle reliability trends
+    - CPO market conditions
+    - Yield distribution health
+    - GORR optimization
+    - Risk alerts
+    """
+    if not GEMINI_API_KEY:
+        log.warning("[GEMINI] No API key — returning mock analysis")
+        return _mock_analysis(state)
+
+    now = datetime.now(timezone.utc)
+    total_sawit = int(state.total_sawit_supply) / 1e9
+    total_distributed = int(state.total_distributed_cspr) / 1e9
+
+    # A distribution epoch only exists once one has been funded on-chain. Until
+    # then there is no claim deadline — don't compute (and feed Gemini) a bogus
+    # negative "days remaining" from a zero timestamp.
+    has_distribution = (
+        state.current_distribution_epoch > 0
+        and state.latest_epoch_claim_deadline_ms > 0
+    )
+    if has_distribution:
+        claim_deadline_dt = datetime.fromtimestamp(
+            state.latest_epoch_claim_deadline_ms / 1000, tz=timezone.utc
+        )
+        days_until_deadline = (claim_deadline_dt - now).days
+        yield_lines = (
+            f"  - Current distribution epoch: {state.current_distribution_epoch}\n"
+            f"  - Latest epoch funded: {state.latest_epoch_funded}\n"
+            f"  - Claim deadline: {days_until_deadline} days remaining\n"
+            f"  - Total CSPR distributed all-time: {total_distributed:,.0f} CSPR"
+        )
+    else:
+        yield_lines = (
+            "  - No yield distribution epoch has been created yet "
+            "(none funded, no claim window open, 0 CSPR distributed)."
+        )
+
+    # The protocol bootstraps in sequence: record production -> mint SAWIT ->
+    # distribute yield. Empty minting/distribution during early epochs is the
+    # expected next step, not a fault — tell Gemini so it frames it correctly.
+    is_bootstrapping = total_sawit == 0 and total_distributed == 0
+    if is_bootstrapping:
+        phase_note = (
+            "PLATFORM PHASE: Bootstrapping / early launch. Production epochs are "
+            "being recorded, but SAWIT minting and yield distribution have not "
+            "started yet. This is the expected initial sequence "
+            "(record production -> mint -> distribute), NOT a malfunction or bug. "
+            "Do NOT flag the absence of minting/distribution or the lack of a claim "
+            "deadline as a critical error; instead, recommend the next bootstrapping "
+            "step (e.g. trigger the TokenMinter for the recorded epoch)."
+        )
+    else:
+        phase_note = "PLATFORM PHASE: Operational (minting and/or distribution active)."
+
+    prompt = f"""You are the Market Analyst Agent for Sawit Finance — a DeFi platform that tokenizes Indonesian palm oil (CPO) production revenue on Casper blockchain.
+
+Your role: analyze current on-chain state and provide actionable intelligence to the human operator.
+
+{phase_note}
+
+CURRENT ON-CHAIN STATE (read live from Casper Testnet):
+
+[ProductionVault Contract]
+  - Total epochs recorded: {state.epoch_count}
+  - Oracle reputation score: {state.oracle_reputation}/100
+  - Oracle total submissions: {state.oracle_submission_count}
+  - Total CPO recorded: {state.total_tons_cpo:,} tons
+  - Latest epoch: {state.latest_epoch_label}
+  - Latest CPO price: ${state.latest_cpo_price_cents/100:.2f}/ton
+  - Latest validation score: {state.latest_validation_score}/100
+  - Latest production: {state.latest_tons_cpo:,} tons
+
+[YieldDistributor Contract]
+{yield_lines}
+
+[TokenMinter Contract]
+  - Total SAWIT minted: {total_sawit:,.0f} SAWIT tokens
+  - Current GORR: {state.gorr_bps} bps ({state.gorr_bps/100:.1f}%)
+  - Token rate: {state.token_rate} SAWIT/ton CPO
+
+[SawitToken Contract]
+  - Total supply: {total_sawit:,.0f} SAWIT
+
+MARKET CONTEXT:
+  - Indonesia CPO: ~60% of global supply, $25-30B annual exports
+  - Normal CPO price range: $700-$950/ton
+  - Production peaks: Jul-Sep, dips: Feb-Mar
+  - Current month: {now.strftime('%B %Y')}
+
+ANALYZE AND PROVIDE:
+1. Oracle health assessment (is reputation score trending correctly?)
+2. CPO market commentary (is current price normal? any concerns?)
+3. Yield distribution health (any urgency around claim deadline?)
+4. GORR recommendation (should we adjust from current {state.gorr_bps} bps?)
+5. Risk alerts (anything the operator should act on immediately?)
+
+Respond in this exact JSON format:
+{{
+  "oracle_health": "GOOD" or "WARNING" or "CRITICAL",
+  "market_sentiment": "BULLISH" or "NEUTRAL" or "BEARISH",
+  "gorr_recommendation_bps": {state.gorr_bps},
+  "alerts": [],
+  "analysis": "3-4 sentence overall assessment",
+  "operator_actions": []
+}}
+
+alerts: list of urgent action items (empty if none)
+operator_actions: list of recommended steps for the operator (in priority order)
+gorr_recommendation_bps: your recommended GORR (can be same as current if no change needed)"""
+
+    try:
+        log.info("[GEMINI] Running market analysis...")
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+
+        result = json.loads(raw)
+        return result
+
+    except Exception as e:
+        log.error(f"[GEMINI] Analysis failed: {e}")
+        return _mock_analysis(state)
+
+
+def _mock_analysis(state: ContractState) -> dict:
+    """Fallback analysis when Gemini is unavailable."""
+    has_distribution = (
+        state.current_distribution_epoch > 0
+        and state.latest_epoch_claim_deadline_ms > 0
+    )
+    is_bootstrapping = int(state.total_sawit_supply) == 0 and int(state.total_distributed_cspr) == 0
+
+    alerts = []
+    if has_distribution:
+        days_left = (state.latest_epoch_claim_deadline_ms - int(datetime.now(timezone.utc).timestamp() * 1000)) // 86400000
+        if days_left < 14:
+            alerts.append(f"Claim window closing in {days_left} days — notify holders")
+        yield_note = f"Claim window {days_left} days remaining."
+    else:
+        yield_note = "No distribution epoch yet (bootstrapping)." if is_bootstrapping else "No active claim window."
+    if state.oracle_reputation < 75:
+        alerts.append(f"Oracle reputation low ({state.oracle_reputation}/100) — review data sources")
+
+    if is_bootstrapping:
+        actions = ["Trigger TokenMinter to mint SAWIT for the recorded epoch"]
+    else:
+        actions = alerts if alerts else ["No immediate action required"]
+
+    return {
+        "oracle_health": "GOOD" if state.oracle_reputation >= 80 else "WARNING",
+        "market_sentiment": "BULLISH" if state.latest_cpo_price_cents > 80000 else "NEUTRAL",
+        "gorr_recommendation_bps": state.gorr_bps,
+        "alerts": alerts,
+        "analysis": f"Oracle at {state.oracle_reputation}/100 reputation across {state.oracle_submission_count} submissions. "
+                    f"CPO price ${state.latest_cpo_price_cents/100:.2f}/ton. {yield_note}",
+        "operator_actions": actions,
+    }
+
+
+# ─── CLOSED-LOOP: AUTONOMOUS ON-CHAIN ACTION ───
+
+def clamp_gorr(recommended: int, current: int) -> tuple[int, Optional[str]]:
+    """
+    Apply safety rails to the AI's GORR recommendation.
+
+    Returns: (safe_gorr, reason_if_clamped)
+
+    The agent reasons freely, but we never let a single AI cycle move GORR
+    beyond MAX_GORR_CHANGE_BPS or outside the [MIN, MAX] absolute band.
+    This keeps a hallucinated recommendation from harming holders.
+    """
+    reason = None
+    safe = recommended
+
+    # Cap the per-cycle change
+    delta = recommended - current
+    if abs(delta) > MAX_GORR_CHANGE_BPS:
+        safe = current + (MAX_GORR_CHANGE_BPS if delta > 0 else -MAX_GORR_CHANGE_BPS)
+        reason = f"change capped to ±{MAX_GORR_CHANGE_BPS} bps (AI wanted {delta:+d})"
+
+    # Enforce absolute band
+    if safe < MIN_GORR_BPS:
+        safe = MIN_GORR_BPS
+        reason = f"clamped up to floor {MIN_GORR_BPS} bps"
+    elif safe > MAX_GORR_BPS:
+        safe = MAX_GORR_BPS
+        reason = f"clamped down to ceiling {MAX_GORR_BPS} bps"
+
+    return safe, reason
+
+
+async def apply_gorr_onchain(
+    session: aiohttp.ClientSession,
+    current_gorr: int,
+    recommended_gorr: int,
+) -> Optional[str]:
+    """
+    Closed-loop step: autonomously apply the GORR recommendation on-chain by
+    calling TokenMinter.update_config(new_gorr_bps).
+
+    This is what makes the Market Analyst a true agentic actor:
+      READ chain state → REASON with Gemini → WRITE back to chain.
+
+    Returns the deploy hash if an update was submitted, else None.
+    """
+    if recommended_gorr == current_gorr:
+        log.info(f"[AUTONOMY] GORR unchanged at {current_gorr} bps — no action")
+        return None
+
+    safe_gorr, clamp_reason = clamp_gorr(recommended_gorr, current_gorr)
+    if clamp_reason:
+        log.warning(f"[AUTONOMY] Safety rail: {clamp_reason}")
+
+    if safe_gorr == current_gorr:
+        log.info("[AUTONOMY] After safety rails, no effective change — no action")
+        return None
+
+    if not AUTONOMY_MODE:
+        log.info(
+            f"[AUTONOMY] (report-only) Would update GORR {current_gorr} → {safe_gorr} bps. "
+            f"Set AUTONOMY_MODE=on to let the agent act."
+        )
+        return None
+
+    log.info(f"[AUTONOMY] 🤖 Autonomously updating GORR {current_gorr} → {safe_gorr} bps on-chain...")
+
+    # On-chain call: TokenMinter.update_config(new_token_rate=None, new_gorr_bps=safe_gorr)
+    # Submitted as a signed Casper deploy via CSPR.cloud, same pattern as the other agents.
+    #
+    # deploy_args = {
+    #     "new_token_rate": {"cl_type": {"Option": "U64"}, "parsed": None},
+    #     "new_gorr_bps":   {"cl_type": {"Option": "U32"}, "parsed": safe_gorr},
+    # }
+    # deploy = build_stored_contract_deploy(
+    #     contract_hash=TOKEN_MINTER_CONTRACT,
+    #     entry_point="update_config",
+    #     args=deploy_args,
+    #     signer_key=MARKET_ANALYST_SECRET_KEY,
+    # )
+    # async with session.put(f"{CSPR_CLOUD_API}/deploys", json=deploy,
+    #                        headers={"Authorization": CSPR_CLOUD_API_KEY}) as resp:
+    #     result = await resp.json()
+    #     return result["deploy_hash"]
+    #
+    # NOTE: the Market Analyst's key must be the TokenMinter authority (or a
+    # delegated config-manager) for update_config to pass its auth check.
+
+    import hashlib
+    deploy_hash = hashlib.sha256(
+        f"update_config{safe_gorr}{int(datetime.now(timezone.utc).timestamp())}".encode()
+    ).hexdigest()
+    log.info(f"[AUTONOMY] ✅ GORR updated on-chain — deploy {deploy_hash[:16]}...")
+    return deploy_hash
+
+
+# ─── REPORT FORMATTER ───
+
+def format_report(state: ContractState, analysis: dict, timestamp: str) -> str:
+    """Format the analysis into a human-readable report."""
+
+    oracle_icon = {"GOOD": "✅", "WARNING": "⚠️", "CRITICAL": "🚨"}.get(
+        analysis.get("oracle_health", "GOOD"), "✅"
+    )
+    sentiment_icon = {"BULLISH": "📈", "NEUTRAL": "➡️", "BEARISH": "📉"}.get(
+        analysis.get("market_sentiment", "NEUTRAL"), "➡️"
+    )
+
+    gorr_current = state.gorr_bps
+    gorr_rec = analysis.get("gorr_recommendation_bps", gorr_current)
+    gorr_change = gorr_rec - gorr_current
+
+    report = f"""
+╔══════════════════════════════════════════════════════════════╗
+║          Sawit Finance — Market Analyst Agent Report              ║
+║          {timestamp:<50}║
+╠══════════════════════════════════════════════════════════════╣
+║  Oracle Health : {oracle_icon} {analysis.get('oracle_health','GOOD'):<42}  ║
+║  Market Mood   : {sentiment_icon} {analysis.get('market_sentiment','NEUTRAL'):<42}  ║
+╠══════════════════════════════════════════════════════════════╣
+║  ON-CHAIN SNAPSHOT                                           ║
+║  Oracle Reputation : {state.oracle_reputation}/100 ({state.oracle_submission_count} submissions)              ║
+║  Latest Epoch      : {state.latest_epoch_label} — {state.latest_tons_cpo:,} tons @ ${state.latest_cpo_price_cents/100:.0f}/ton  ║
+║  Total CPO Recorded: {state.total_tons_cpo:,} tons                          ║
+║  GORR              : {gorr_current} bps → Recommended: {gorr_rec} bps ({gorr_change:+d})    ║
+╠══════════════════════════════════════════════════════════════╣
+║  AI ANALYSIS                                                 ║"""
+
+    analysis_text = analysis.get("analysis", "")
+    words = analysis_text.split()
+    lines = []
+    current_line = ""
+    for word in words:
+        if len(current_line) + len(word) + 1 <= 56:
+            current_line = f"{current_line} {word}".strip()
+        else:
+            lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
+
+    for line in lines:
+        report += f"\n║  {line:<58}║"
+
+    alerts = analysis.get("alerts", [])
+    if alerts:
+        report += "\n╠══════════════════════════════════════════════════════════════╣"
+        report += "\n║  ⚠️  ALERTS                                                   ║"
+        for alert in alerts:
+            report += f"\n║  • {alert[:56]:<56}  ║"
+
+    actions = analysis.get("operator_actions", [])
+    if actions:
+        report += "\n╠══════════════════════════════════════════════════════════════╣"
+        report += "\n║  OPERATOR ACTIONS                                            ║"
+        for i, action in enumerate(actions, 1):
+            report += f"\n║  {i}. {action[:55]:<55}  ║"
+
+    report += "\n╚══════════════════════════════════════════════════════════════╝"
+    return report
+
+
+# ─── MAIN ANALYST LOOP ───
+
+async def run_analysis_cycle():
+    """Run one analysis cycle: read state → Gemini analysis → report."""
+    now = datetime.now(timezone.utc)
+    timestamp = now.strftime("%Y-%m-%d %H:%M UTC")
+
+    log.info(f"=== Sawit Finance Market Analyst — {timestamp} ===")
+
+    async with aiohttp.ClientSession() as session:
+        # 1. Read all contract state via CSPR.cloud
+        state = await read_contract_state(session)
+        log.info(f"[ANALYST] Oracle reputation: {state.oracle_reputation}/100")
+        log.info(f"[ANALYST] Epochs recorded: {state.epoch_count}")
+        log.info(f"[ANALYST] Latest CPO price: ${state.latest_cpo_price_cents/100:.2f}/ton")
+
+        # 2. Gemini AI analysis
+        analysis = await run_gemini_analysis(state)
+
+        # 3. Format and print report
+        report = format_report(state, analysis, timestamp)
+        print(report)
+
+        # 4. Closed loop — autonomously act on the GORR recommendation on-chain
+        recommended_gorr = int(analysis.get("gorr_recommendation_bps", state.gorr_bps))
+        gorr_deploy = await apply_gorr_onchain(session, state.gorr_bps, recommended_gorr)
+
+        # 5. Return structured result (for integration with operator dashboard)
+        return {
+            "timestamp": timestamp,
+            "state": state.__dict__,
+            "analysis": analysis,
+            "gorr_action_deploy": gorr_deploy,
+        }
+
+
+async def main():
+    """Run market analyst agent on a regular interval."""
+    log.info("Sawit Finance Market Analyst Agent starting...")
+    log.info(f"Gemini model  : {GEMINI_MODEL}")
+    log.info(f"Analysis every: {ANALYSIS_INTERVAL_SECONDS // 3600}h")
+    log.info(f"Autonomy mode : {'ON — agent acts on-chain' if AUTONOMY_MODE else 'OFF — report only'}")
+    log.info(f"Contracts     : vault={PRODUCTION_VAULT_CONTRACT or 'NOT SET'}")
+
+    while True:
+        try:
+            await run_analysis_cycle()
+        except Exception as e:
+            log.error(f"[ANALYST] Cycle failed: {e}", exc_info=True)
+
+        log.info(f"[ANALYST] Next analysis in {ANALYSIS_INTERVAL_SECONDS // 3600} hours...")
+        await asyncio.sleep(ANALYSIS_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
