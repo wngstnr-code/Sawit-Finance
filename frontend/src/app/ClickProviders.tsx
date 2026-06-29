@@ -10,12 +10,17 @@ import {
 import type { CsprClickInitOptions } from '@make-software/csprclick-core-types';
 import { CONTENT_MODE } from '@make-software/csprclick-core-types';
 import StyledRegistry from '@/lib/StyledRegistry';
-import { CSPR_CLICK_APP_ID } from '@/lib/config';
+import { CSPR_CLICK_APP_ID, NETWORK } from '@/lib/config';
 
 const clickOptions: CsprClickInitOptions = {
   appName: 'Sawit Finance',
   appId: CSPR_CLICK_APP_ID,
   contentMode: CONTENT_MODE.IFRAME,
+  // Our four contracts live on Casper Testnet, so force the testnet chain —
+  // this overrides the network configured for the appId on CSPR.build and makes
+  // CSPR.click broadcast claims to a casper-test node (otherwise the node
+  // rejects them with "invalid chain name").
+  chainName: NETWORK.name, // 'casper-test'
   providers: ['casper-wallet', 'ledger', 'casper-signer', 'metamask-snap'],
 };
 
