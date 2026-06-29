@@ -1,0 +1,27 @@
+[package]
+name = "yield-distributor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+odra = { workspace = true }
+production-vault = { path = "../production-vault" }
+
+[dev-dependencies]
+odra-test = { workspace = true }
+
+[build-dependencies]
+odra-build = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+odra-build = { workspace = true }
+
+[[bin]]
+name = "yield_distributor_build_contract"
+path = "bin/build_contract.rs"
+test = false
+
+[[bin]]
+name = "yield_distributor_build_schema"
+path = "bin/build_schema.rs"
+test = false
