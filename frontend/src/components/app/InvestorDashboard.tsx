@@ -43,14 +43,26 @@ type BandItem = { label: string; value: string; sub?: string; accent?: boolean }
 
 /* ─────────────────────────── derived helpers ─────────────────────────── */
 
-function useDerived(state: ContractState | null, balance: number | null) {
+// Per-account claimable CSPR is operator-set on-chain (set_claimable) and isn't
+// surfaced by CSPR.cloud, so for known demo holders we show their real allocation
+// instead of the pro-rata estimate (which is 0 until total_distributed > 0).
+const KNOWN_CLAIMABLE: Record<string, number> = {
+  '0202111d3b480feaea33ce6839d087d9f685a3348fba27008221f52dfe2034656adc': 25,
+};
+
+function useDerived(
+  state: ContractState | null,
+  balance: number | null,
+  publicKey?: string
+) {
   return useMemo(() => {
     const supply = state ? Number(state.total_sawit_supply) : 0;
     const share = balance && supply ? balance / supply : 0;
     const distributed = state
       ? fromBaseUnits(state.total_distributed_cspr, CSPR_DECIMALS)
       : 0;
-    const estYield = share * distributed;
+    const known = KNOWN_CLAIMABLE[(publicKey || '').toLowerCase()];
+    const estYield = known ?? share * distributed;
     const cpoValueM = state
       ? (state.total_tons_cpo * state.latest_cpo_price_cents) / 100 / 1_000_000
       : 0;
@@ -63,7 +75,7 @@ function useDerived(state: ContractState | null, balance: number | null) {
       ? Math.max(0, Math.ceil((state.latest_epoch_claim_deadline_ms - Date.now()) / 86_400_000))
       : null;
     return { supply, share, distributed, estYield, cpoValueM, revenueToHolders, projPerSawit, daysLeft };
-  }, [state, balance]);
+  }, [state, balance, publicKey]);
 }
 
 /* ─────────────────────────── root ─────────────────────────── */
@@ -75,7 +87,7 @@ export default function InvestorDashboard() {
   const { balance, loading: balLoading, reload } = useSawitBalance(publicKey);
   const [tab, setTab] = useState<Tab>('overview');
   const [claim, setClaim] = useState<ClaimPhase>({ phase: 'idle' });
-  const d = useDerived(state, balance);
+  const d = useDerived(state, balance, publicKey);
 
   async function handleClaim() {
     if (!clickRef || !publicKey || !state) return;
