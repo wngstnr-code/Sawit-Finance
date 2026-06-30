@@ -27,7 +27,7 @@ Indonesia produces ~60% of the world's palm oil — a **$30B+/year** export mark
 
 ## The Solution
 
-Sawit Finance tokenizes **CPO production revenue** as **SAWIT** (a CEP-18 token). Each token is a fractional, yield-bearing claim on real palm oil output — not a synthetic, not a price tracker. Production is verified by an AI oracle, SAWIT is minted against verified tonnage, and revenue flows back to holders as on-chain CSPR yield.
+Sawit Finance tokenizes **CPO production revenue** as **SAWIT** (a CEP-18 token). Each token is a fractional, yield-bearing claim on real palm oil output — not a synthetic, not a price tracker. An AI oracle runs a live verification pipeline and records each production epoch on-chain (the palm-oil **price is a live feed**; production tonnage is representative today — [stated plainly below](#data-provenance--whats-live-vs-representative)); SAWIT is then minted against that on-chain record **via CPI**, so the operator can't inflate it, and revenue flows back to holders as on-chain CSPR yield.
 
 The difference from a typical RWA: **every operator action is verifiable on-chain.** An AI oracle's accuracy is scored on-chain, mint amounts are read cross-contract (the operator can't fabricate them), and yield claims are KYC-gated and leave permanent receipts. A trusted operator that can't lie undetected.
 
@@ -40,7 +40,7 @@ Palm Oil Mills (PKS)
        │
        ▼
 AI Oracle Agent ──live──> FRED/IMF palm oil price   (real feed, every cycle)
-       │        ──x402──> KPBN / MPOB / GAPKI        (Gemini cross-validation)
+       │        ──x402──> KPBN / MPOB / GAPKI        (tonnage representative · Gemini check)
        │
        ▼
 ProductionVault ───────────────┐  (verified CPO tons + price, KYC registry,
@@ -113,6 +113,12 @@ Three AI agents run the protocol autonomously — this is the heart of the Build
 **Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded — here's an actual agent-driven GORR change on Testnet: [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (the agent moved GORR 510→500 bps). **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band — a hallucinated recommendation can never harm holders.
 
 **Gemini reasoning gate.** Before data hits the chain, the Oracle Agent passes all 3 source readings to Gemini, which flags seasonal anomalies / suspicious spikes and can veto a submission (`"recommendation": "REJECT"` blocks the epoch regardless of the statistical score).
+
+### Data provenance — what's live vs. representative
+
+Stated plainly, because it matters: the **palm-oil price is a genuinely live feed** (FRED `PPOILUSDM`, IMF — pulled every cycle, no key), and the **entire verification pipeline runs for real on it** — 3-source cross-check, divergence scoring, the Gemini anomaly veto, and the on-chain reputation score. The one piece **not** yet wired to a real-time source is **production tonnage**: GAPKI / KPBN / MPOB publish monthly *aggregate* figures as PDFs, not per-estate APIs, so the tonnage the pipeline ingests is a **representative figure** (clearly labelled as such in `agents/oracle_agent.py`), not scraped live.
+
+This is a **data-source** limitation, not an architectural one. The pipeline is feed-agnostic — connecting a live mill-data partnership (a scoped [mainnet step](#roadmap)) swaps the input without touching the contracts or the agent logic. And nothing downstream is faked: once an epoch is recorded on-chain, `TokenMinter` reads the tonnage **via CPI** (`token_minter.rs`), so the minted amount is cryptographically locked to the on-chain record — the operator can't substitute a different number after the fact, live feed or not.
 
 **x402 micropayments — live on-chain settlement.** Agents pay per-request for gated CPO data using a real **x402 handshake** (ed25519, amount/recipient/resource/nonce binding, replay-protected). Settlement is **live**: `agents/x402_settle.py` runs the handshake and then **broadcasts a real native CSPR transfer on Casper Testnet** for the payment, verifying it executed before serving the data. Example settlement: [`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856).
 
