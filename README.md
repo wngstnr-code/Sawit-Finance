@@ -6,9 +6,10 @@
 
 Built for the **Casper Agentic Buildathon 2026**.
 
-**🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt)
+**🎥 [Watch the demo](https://youtu.be/jT4uH5fRL8E)** · **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt)
 
 > ### ✅ Verify it yourself in 30 seconds
+> - **🎥 Watch the demo:** [youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E) — full walkthrough (claim, agent on-chain write, MCP, x402)
 > - **🟢 Use it:** [sawitfinance.xyz](https://sawitfinance.xyz) — connect a Casper wallet and claim real CSPR yield
 > - **⛓️ See the loop on-chain:** KYC-gated yield claim [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) on cspr.live (record→mint→fund→claim — [full loop below](#live-on-casper-testnet--the-full-loop-executed-on-chain))
 > - **🤖 Agentic write:** an autonomous agent's GORR decision, broadcast on-chain [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (read→reason→write, with safety rails)
@@ -214,7 +215,7 @@ deploy/      livenet deploy + agent-driven bins (record/fund/set_gorr/mint/claim
 frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live reads & claims)
 ```
 
-Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
+Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
 
 ---
 
