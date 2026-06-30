@@ -92,11 +92,12 @@ export default function RequestAccess({
           onClick={close}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-card shadow-card-lg"
+            data-lenis-prevent
+            className="max-h-[90dvh] w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-line bg-card shadow-card-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {/* header */}
-            <div className="flex items-start justify-between border-b border-line p-6">
+            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-card p-6">
               <div>
                 <div className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-brand">
                   <span className="h-px w-4 bg-brand/40" />

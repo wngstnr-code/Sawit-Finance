@@ -25,7 +25,7 @@ export default function AccessSection() {
     <Section id="access" className="py-24 sm:py-32">
       <Reveal>
         <div className="overflow-hidden rounded-3xl border border-line bg-card shadow-card-lg">
-          <div className="grid gap-10 p-8 sm:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
+          <div className="grid gap-10 p-6 sm:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
             {/* left: pitch */}
             <div className="flex flex-col">
               <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand">
@@ -42,14 +42,14 @@ export default function AccessSection() {
                 claimed in CSPR, KYC-gated on-chain.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-8 flex items-center gap-3">
                 <RequestAccess
                   context="landing"
-                  className="rounded-lg bg-ink px-6 py-3 text-sm font-medium text-bg transition-transform hover:-translate-y-0.5"
+                  className="flex-1 rounded-lg bg-ink px-3 py-3 text-center text-[13px] font-medium text-bg transition-transform hover:-translate-y-0.5 sm:flex-none sm:px-6 sm:text-sm"
                 />
                 <a
                   href="/app"
-                  className="rounded-lg border border-line-2 bg-white px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-brand/40"
+                  className="flex-1 rounded-lg border border-line-2 bg-white px-3 py-3 text-center text-[13px] font-medium text-ink transition-colors hover:border-brand/40 sm:flex-none sm:px-6 sm:text-sm"
                 >
                   Open the app
                 </a>

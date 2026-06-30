@@ -171,16 +171,22 @@ export default function InvestorDashboard() {
         </div>
 
         {connected && (
-          <div className="flex gap-5 overflow-x-auto border-t border-line px-5 py-2.5 md:hidden">
+          <div className="flex justify-center gap-1 overflow-x-auto border-t border-line px-3 py-1.5 [scrollbar-width:none] md:hidden">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`whitespace-nowrap text-[13px] font-medium ${
+                className={`relative flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-[14px] font-medium transition-colors ${
                   tab === t.id ? 'text-ink' : 'text-muted'
                 }`}
               >
                 {t.label}
+                {tab === t.id && (
+                  <motion.span
+                    layoutId="tab-underline-mobile"
+                    className="absolute inset-x-3 bottom-1 h-0.5 rounded-full bg-ink"
+                  />
+                )}
               </button>
             ))}
           </div>

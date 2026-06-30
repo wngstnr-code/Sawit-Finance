@@ -14,11 +14,11 @@ export default function StandardSection() {
 
   return (
     <Section className="py-24 text-center sm:py-32">
-      <div className="mx-auto mb-14 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[12px] uppercase tracking-[0.12em] text-faint">
+      <div className="mx-auto mb-14 flex flex-col items-center justify-center gap-y-1.5 text-center font-mono text-[12px] uppercase tracking-[0.12em] text-faint sm:flex-row sm:gap-x-5 sm:gap-y-2">
         <span>Live on Casper Testnet</span>
-        <span className="text-line-2">·</span>
+        <span className="hidden text-line-2 sm:inline">·</span>
         <span>4 contracts on-chain</span>
-        <span className="text-line-2">·</span>
+        <span className="hidden text-line-2 sm:inline">·</span>
         <span>AI-verified oracle</span>
       </div>
 
@@ -49,7 +49,7 @@ export default function StandardSection() {
               <span className="text-faint">$0.00M</span>
             )}
           </div>
-          <div className="mt-3 text-sm uppercase tracking-[0.16em] text-faint">
+          <div className="mx-auto mt-3 max-w-xs text-balance text-xs uppercase tracking-[0.14em] text-faint sm:max-w-none sm:text-sm sm:tracking-[0.16em]">
             in verified CPO value, recorded on-chain
           </div>
         </div>
