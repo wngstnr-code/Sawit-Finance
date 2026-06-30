@@ -6,7 +6,7 @@
 
 Built for the **Casper Agentic Buildathon 2026**.
 
-**🎥 [Watch the demo](https://youtu.be/jT4uH5fRL8E)** · **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt)
+**🎥 [Watch the demo](https://youtu.be/jT4uH5fRL8E)** · **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159)
 
 > ### ✅ Verify it yourself in 30 seconds
 > - **🎥 Watch the demo:** [youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E) — full walkthrough (claim, agent on-chain write, MCP, x402)
