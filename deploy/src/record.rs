@@ -1,12 +1,3 @@
-//! Sawit Finance — record one production epoch on the deployed ProductionVault.
-//!
-//! This is the first *functional* (non-install) transaction: the oracle account
-//! (the deployer) submits AI-verified CPO production data for an epoch, then we
-//! read it back from chain to confirm.
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     cargo run -p sawit-deploy --bin record --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -22,12 +13,9 @@ fn main() {
     use production_vault::production_vault::SawitProductionVault;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    // Deployed ProductionVault package hash (see README → Live on Casper Testnet).
     const VAULT: &str =
         "hash-0b860c574e7b7cd6969a33dd57992fc6efedd503473b44e1c9309f1c8455e365";
 
-    // Read the epoch values the Oracle Agent computed (env-overridable so the
-    // agent posts its OWN reasoned data; defaults keep a manual `cargo run` working).
     fn ev<T: std::str::FromStr>(key: &str, default: T) -> T {
         std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
     }
@@ -53,7 +41,6 @@ fn main() {
     let before = vault.get_epoch_count();
     println!("Epochs on-chain before: {before}");
 
-    // A strictly-increasing timestamp (must beat last_epoch_timestamp).
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -80,7 +67,6 @@ fn main() {
     let rep = vault.get_oracle_reputation();
     let subs = vault.get_oracle_submission_count();
 
-    // Machine-readable marker so the Oracle Agent can confirm the write landed.
     println!("RECORD_OK {{\"epoch_count\":{after},\"reputation\":{rep}}}");
 
     println!("\n── Recorded ──");

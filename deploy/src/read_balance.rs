@@ -1,13 +1,3 @@
-//! Sawit Finance — read a single account's live SAWIT (CEP-18) balance from the
-//! token contract via Odra's livenet client. CSPR.cloud can't surface Odra's
-//! internal state, so the frontend reads balances through this bridge (served by
-//! the /api/balance route). The account is passed via the BALANCE_ACCOUNT env var
-//! as a formatted `account-hash-...` string.
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     BALANCE_ACCOUNT=account-hash-<hex> \
-//!       cargo run -p sawit-deploy --bin read_balance --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -36,9 +26,8 @@ fn main() {
 
     let balance = token.balance_of(&addr);
     let epoch = dist.get_current_epoch();
-    let claimable = dist.get_claimable(epoch, &addr); // U512 motes for the current epoch
+    let claimable = dist.get_claimable(epoch, &addr);
 
-    // Machine-readable line the /api/balance route parses.
     println!(
         "SAWIT_BALANCE_JSON {{\"account\":\"{account}\",\"balance\":\"{balance}\",\"claimable_motes\":\"{claimable}\",\"epoch\":{epoch}}}"
     );

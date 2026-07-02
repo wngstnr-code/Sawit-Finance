@@ -1,13 +1,3 @@
-//! Sawit Finance — mint SAWIT for a recorded production epoch (bootstrapping step 2).
-//!
-//! The authority (deployer) calls TokenMinter.mint_epoch(epoch, pool). The minter
-//! reads the epoch straight from ProductionVault via CPI (it does not trust caller
-//! figures), computes tokens = tons × token_rate × gorr_bps / 10_000, and mints
-//! SAWIT (CEP-18) to the allocation pool. Then we read back the new totals.
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     cargo run -p sawit-deploy --bin mint --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -25,7 +15,6 @@ fn main() {
     const MINTER: &str = "hash-cb3b96b8cdb987178db0353ef6a713a7d888a4256f59702243187982358d8e06";
     const TOKEN: &str = "hash-579f3197493048529a56ea3887721c4bd027e3fad6755644f19446b4c9205a47";
 
-    // Mint for the first recorded epoch; tokens go to the deployer's pool.
     const EPOCH: u64 = 1;
 
     let env = odra_casper_livenet_env::env();

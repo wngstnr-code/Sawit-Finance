@@ -1,12 +1,3 @@
-//! Sawit Finance — allocate a holder's claimable CSPR on the CURRENT distribution
-//! epoch (the one the Yield Router just funded), so they can perform a real, live
-//! `claim_yield` from the app UI. Unlike `grant`, this neither funds the purse nor
-//! transfers SAWIT — it only KYCs (idempotent) and sets the claimable amount, so
-//! it's safe to run after an agent-funded epoch without side effects.
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     cargo run -p sawit-deploy --bin set_claimable --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -32,7 +23,7 @@ fn main() {
     let amount_motes: u64 = std::env::var("CLAIM_AMOUNT_MOTES")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(25_000_000_000u64); // 25 CSPR
+        .unwrap_or(25_000_000_000u64);
 
     let env = odra_casper_livenet_env::env();
     let holder = Address::from_str(&holder_str).expect("valid account hash");
@@ -41,14 +32,12 @@ fn main() {
     let mut vault = SawitProductionVault::load(&env, Address::new(VAULT).unwrap());
     let mut dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());
 
-    // Target the current (just-funded) epoch.
     let epoch = std::env::var("CLAIM_EPOCH")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or_else(|| dist.get_current_epoch());
     println!("Current distribution epoch: {epoch}");
 
-    // KYC the holder (idempotent).
     if vault.is_kyc_verified(&holder) {
         println!("Holder already KYC-verified.");
     } else {
@@ -57,7 +46,6 @@ fn main() {
         vault.register_kyc(holder);
     }
 
-    // Allocate the claimable amount for the current epoch.
     println!("set_claimable({epoch}, holder, {} CSPR)...", amount_motes as f64 / 1e9);
     env.set_gas(5_000_000_000);
     dist.set_claimable(epoch, holder, U512::from(amount_motes));

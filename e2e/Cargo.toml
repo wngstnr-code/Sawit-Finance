@@ -3,7 +3,6 @@ name = "sawit-e2e"
 version = "0.1.0"
 edition = "2021"
 
-# Integration tests only — this crate ships no contract code.
 [lib]
 path = "src/lib.rs"
 

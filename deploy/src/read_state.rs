@@ -1,16 +1,3 @@
-//! Sawit Finance — read live on-chain state from all 4 deployed contracts.
-//!
-//! Read-only (no gas, no tx). Uses Odra's livenet client — the same proven read
-//! path the deploy/record bins use — so it reads Odra's `state` dictionary
-//! correctly (CSPR.cloud's named-keys endpoint can't, since Odra stores state in
-//! a dictionary, not classic named keys).
-//!
-//! Emits ONE line prefixed `SAWIT_STATE_JSON ` so callers can separate it from
-//! Odra's log output. Consumed by agents/market_analyst_agent.py.
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     cargo run -p sawit-deploy --bin read_state --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -34,7 +21,6 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
 
-    // ── ProductionVault ──
     let vault = SawitProductionVault::load(&env, Address::new(VAULT).unwrap());
     let epoch_count = vault.get_epoch_count();
     let oracle_reputation = vault.get_oracle_reputation();
@@ -45,17 +31,14 @@ fn main() {
         None => (String::from("none"), 0u64, 0u8, 0u64),
     };
 
-    // ── TokenMinter ──
     let minter = SawitMinter::load(&env, Address::new(MINTER).unwrap());
     let total_minted = minter.get_total_tokens_minted();
     let gorr_bps = minter.get_gorr_bps();
     let token_rate = minter.get_token_rate();
 
-    // ── SawitToken ──
     let token = SawitToken::load(&env, Address::new(TOKEN).unwrap());
     let total_supply = token.total_supply();
 
-    // ── YieldDistributor ──
     let dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());
     let cur_epoch = dist.get_current_epoch();
     let total_distributed = dist.get_total_distributed();
@@ -64,7 +47,6 @@ fn main() {
         None => (false, 0u64),
     };
 
-    // Hand-rolled JSON (avoids a serde dependency); strings here are simple/ASCII.
     let json = format!(
         "{{\"epoch_count\":{epoch_count},\"oracle_reputation\":{oracle_reputation},\
 \"oracle_submission_count\":{oracle_submission_count},\"total_tons_cpo\":{total_tons_cpo},\

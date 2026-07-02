@@ -1,15 +1,3 @@
-//! Sawit Finance — demo setup: give the user's wallet a real SAWIT position and a
-//! fresh claimable allocation so the investor dashboard shows live holdings and a
-//! claim that succeeds. Operator (deployer / authority) actions:
-//!   1. SawitToken.transfer(holder, 100 SAWIT)   — from the deployer's supply
-//!   2. YieldDistributor.create_epoch('Jul-2026') — fresh epoch (holder already
-//!      claimed epoch 1)
-//!   3. YieldDistributor.fund_epoch(n)            — +30 CSPR into the purse
-//!   4. ProductionVault.register_kyc(holder) [idempotent] + set_claimable(n, holder, 25 CSPR)
-//!
-//! Run:
-//!     set -a && . ./.env && set +a
-//!     cargo run -p sawit-deploy --bin demo --features livenet
 
 #[cfg(not(feature = "livenet"))]
 fn main() {
@@ -30,7 +18,6 @@ fn main() {
     const TOKEN: &str = "hash-579f3197493048529a56ea3887721c4bd027e3fad6755644f19446b4c9205a47";
     const VAULT: &str = "hash-0b860c574e7b7cd6969a33dd57992fc6efedd503473b44e1c9309f1c8455e365";
     const DIST: &str = "hash-1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9";
-    // The user's own Casper Wallet account (secp256k1 0202111d…656adc).
     const HOLDER_ACCOUNT: &str =
         "account-hash-e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe";
 
@@ -42,31 +29,27 @@ fn main() {
     let mut vault = SawitProductionVault::load(&env, Address::new(VAULT).unwrap());
     let mut dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());
 
-    // 1. Transfer 100 SAWIT from the deployer (holds the minted supply) to the user.
     println!("\n[1/4] transfer 100 SAWIT → holder...");
     env.set_gas(6_000_000_000);
     token.transfer(&holder, &U256::from(100u64));
     println!("Holder SAWIT balance: {}", token.balance_of(&holder));
 
-    // 2. Create a fresh distribution epoch (holder already claimed epoch 1).
-    let pool: U512 = U512::from(30_000_000_000u64); // 30 CSPR
+    let pool: U512 = U512::from(30_000_000_000u64);
     println!("\n[2/4] create_epoch('Jul-2026')...");
     env.set_gas(6_000_000_000);
     dist.create_epoch("Jul-2026".to_string(), pool, 1, 82_500);
     let epoch = dist.get_current_epoch();
     println!("New distribution epoch: #{epoch}");
 
-    // 3. Fund the new epoch with 30 CSPR (payable).
     println!("\n[3/4] fund_epoch({epoch}) with 30 CSPR...");
     env.set_gas(25_000_000_000);
     dist.with_tokens(pool).fund_epoch(epoch);
 
-    // 4. KYC (idempotent) + set the holder's claimable for the new epoch.
     if !vault.is_kyc_verified(&holder) {
         env.set_gas(5_000_000_000);
         vault.register_kyc(holder);
     }
-    let claim_amount: U512 = U512::from(25_000_000_000u64); // 25 CSPR
+    let claim_amount: U512 = U512::from(25_000_000_000u64);
     println!("\n[4/4] set_claimable({epoch}, holder, 25 CSPR)...");
     env.set_gas(5_000_000_000);
     dist.set_claimable(epoch, holder, claim_amount);
