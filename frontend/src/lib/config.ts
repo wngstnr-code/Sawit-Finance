@@ -1,5 +1,3 @@
-// Sawit Finance — deployed Casper Testnet contracts (ContractPackageHash) + network.
-// These are public; safe to expose to the browser.
 
 export const NETWORK = {
   name: 'casper-test',
@@ -14,22 +12,12 @@ export const CONTRACTS = {
   yieldDistributor: '1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9',
 } as const;
 
-// Investor onboarding contact. SAWIT is a permissioned RWA — access is via the
-// licensed operator (KYC), not an open swap. Replace with the real inbox before
-// launch. Override with NEXT_PUBLIC_ACCESS_EMAIL.
 export const ACCESS_EMAIL =
   process.env.NEXT_PUBLIC_ACCESS_EMAIL || 'wangsitsada1234@gmail.com';
 
-// CSPR.click app id — 'csprclick-template' works for local dev; register a real
-// one before deploying to a server.
 export const CSPR_CLICK_APP_ID =
   process.env.NEXT_PUBLIC_CSPR_CLICK_APP_ID || 'csprclick-template';
 
-// NOTE: SawitToken metadata decimals = 9, but TokenMinter's mint formula
-// (tons × rate × gorr_bps / 10_000) does NOT scale by 10^9, so the on-chain
-// integer is the protocol's whole-token accounting unit (matches the mint output
-// and README tokenomics). We display it as-is (decimals 0). Proper fix: scale the
-// mint by 10^decimals in the contract + redeploy. CSPR is genuine motes (9).
 export const SAWIT_DECIMALS = 0;
 export const CSPR_DECIMALS = 9;
 

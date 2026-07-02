@@ -3,10 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useClickRef } from '@make-software/csprclick-ui';
 
-/**
- * Shared wallet-account hook built on CSPR.click. Tracks the active public key
- * across sign-in / switch / sign-out and exposes connect/disconnect helpers.
- */
 export function useAccount() {
   const clickRef = useClickRef();
   const [publicKey, setPublicKey] = useState<string | undefined>();

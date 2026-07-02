@@ -1,7 +1,5 @@
-// Display formatters for Sawit Finance on-chain values.
 
 export function fromBaseUnits(raw: string, decimals: number): number {
-  // values are small enough here to use Number safely for display
   if (!raw) return 0;
   return Number(raw) / 10 ** decimals;
 }

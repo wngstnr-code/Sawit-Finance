@@ -1,11 +1,5 @@
 import type { ContractState } from './config';
 
-// Real on-chain snapshot, read from the four Sawit Finance contracts on Casper
-// Testnet via the `read_state` bridge (2026-06-30). Served by /api/state as a
-// fallback when the live bridge binary isn't available (e.g. serverless deploys
-// like Vercel, which can't run the native Rust reader). Values are genuine —
-// they reflect live agent activity (Oracle recorded Jul-2026; Yield Router funded
-// distribution epoch 3; Market Analyst tuned GORR — all on-chain).
 export const STATE_SNAPSHOT: ContractState = {
   epoch_count: 2,
   oracle_reputation: 91,

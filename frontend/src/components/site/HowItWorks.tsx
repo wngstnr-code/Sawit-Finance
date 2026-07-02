@@ -56,7 +56,6 @@ export default function HowItWorks() {
           </h2>
         </Reveal>
 
-        {/* carousel of cards */}
         <div className="mt-14 flex flex-col gap-3 sm:flex-row sm:gap-4">
           {steps.map((s, i) => {
             const isActive = i === active;
@@ -73,7 +72,6 @@ export default function HowItWorks() {
                 }`}
               >
                 {!isActive && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src="/sawit-fi-icon-white.svg"
                     alt=""

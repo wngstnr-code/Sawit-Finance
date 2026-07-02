@@ -9,7 +9,6 @@ export type CpoHistory = {
   source: string;
 };
 
-// Shared across landing + app so the real FRED price history is fetched once.
 let cache: CpoHistory | null = null;
 let inflight: Promise<CpoHistory | null> | null = null;
 

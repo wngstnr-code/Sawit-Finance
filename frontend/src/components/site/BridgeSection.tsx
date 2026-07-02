@@ -6,7 +6,6 @@ import { Reveal } from '@/components/motion/Reveal';
 export default function BridgeSection() {
   return (
     <section className="relative overflow-hidden bg-ink py-28 text-center sm:py-36">
-      {/* arc graphic */}
       <svg
         className="pointer-events-none absolute left-1/2 top-0 -z-0 h-[120%] w-[140%] -translate-x-1/2"
         viewBox="0 0 1000 600"

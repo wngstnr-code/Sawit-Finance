@@ -4,12 +4,10 @@ import { pkgUrl } from '@/lib/onchain';
 export default function SiteFooter() {
   return (
     <footer className="border-t border-line bg-bg-2/50">
-      {/* links */}
       <div>
         <div className="mx-auto grid w-full max-w-content gap-8 px-5 py-12 sm:grid-cols-[1.4fr_1fr_1fr] sm:px-8">
           <div>
             <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/sawit-fi-icon-black.svg" alt="" className="h-7 w-7" />
               <span className="font-display text-base text-ink">
                 <span className="font-semibold">Sawit</span>
@@ -91,7 +89,6 @@ export default function SiteFooter() {
           </p>
         </div>
 
-        {/* giant wordmark */}
         <div className="overflow-hidden px-5 sm:px-8">
           <div className="mx-auto max-w-content">
             <div className="select-none whitespace-nowrap text-center font-display text-[13vw] font-semibold leading-[0.8] tracking-tighter2">

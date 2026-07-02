@@ -16,16 +16,11 @@ const clickOptions: CsprClickInitOptions = {
   appName: 'Sawit Finance',
   appId: CSPR_CLICK_APP_ID,
   contentMode: CONTENT_MODE.IFRAME,
-  // Our four contracts live on Casper Testnet, so force the testnet chain —
-  // this overrides the network configured for the appId on CSPR.build and makes
-  // CSPR.click broadcast claims to a casper-test node (otherwise the node
-  // rejects them with "invalid chain name").
-  chainName: NETWORK.name, // 'casper-test'
+  chainName: NETWORK.name,
   providers: ['casper-wallet', 'ledger', 'casper-signer', 'metamask-snap'],
 };
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // ClickUI loads a remote runtime; only mount it on the client after hydration.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 

@@ -24,7 +24,6 @@ const stack = ['Casper', 'Odra', 'x402', 'Gemini 2.5', 'CSPR.cloud', 'CEP-18'];
 export default function TechSection() {
   return (
     <section id="agents" className="relative isolate flex min-h-screen flex-col justify-center overflow-hidden bg-ink py-28 sm:py-36">
-      {/* dark cinematic backdrop */}
       <div className="absolute inset-0 -z-10 opacity-30">
         <Image
           src="/hero/plantation.jpg"

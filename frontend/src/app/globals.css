@@ -9,7 +9,6 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* Lenis smooth scroll */
 html.lenis,
 html.lenis body {
   height: auto;
@@ -33,7 +32,6 @@ body {
 }
 
 @layer utilities {
-  /* soft ivory grain/glow backdrop for light sections */
   .bg-aura {
     background:
       radial-gradient(60rem 40rem at 80% -10%, rgba(30, 122, 79, 0.08), transparent 60%),
@@ -44,7 +42,6 @@ body {
   }
 }
 
-/* CSPR.click iframe modal sits above everything */
 iframe[id^='csprclick'] {
   z-index: 60;
 }

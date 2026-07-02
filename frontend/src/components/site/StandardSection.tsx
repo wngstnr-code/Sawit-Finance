@@ -33,7 +33,6 @@ export default function StandardSection() {
         </p>
       </Reveal>
 
-      {/* big animated value */}
       <Reveal delay={0.1}>
         <div className="mt-16">
           <div className="font-display text-6xl font-semibold tracking-tighter2 text-ink sm:text-8xl">
@@ -55,7 +54,6 @@ export default function StandardSection() {
         </div>
       </Reveal>
 
-      {/* product preview card */}
       <motion.div
         initial={{ opacity: 0, y: 40, scale: 0.96 }}
         whileInView={{ opacity: 1, y: 0, scale: 1 }}

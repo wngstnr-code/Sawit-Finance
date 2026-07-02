@@ -41,8 +41,6 @@ type ClaimPhase =
 
 type BandItem = { label: string; value: string; sub?: string; accent?: boolean };
 
-/* ─────────────────────────── derived helpers ─────────────────────────── */
-
 function useDerived(
   state: ContractState | null,
   balance: number | null,
@@ -54,13 +52,10 @@ function useDerived(
     const distributed = state
       ? fromBaseUnits(state.total_distributed_cspr, CSPR_DECIMALS)
       : 0;
-    // Real per-account claimable (operator-set, read from chain); fall back to the
-    // pro-rata estimate only when we don't have a concrete allocation.
     const estYield = claimable && claimable > 0 ? claimable : share * distributed;
     const cpoValueM = state
       ? (state.total_tons_cpo * state.latest_cpo_price_cents) / 100 / 1_000_000
       : 0;
-    // projected yield to holders, derived live from on-chain GORR × production
     const revenueToHolders = state
       ? cpoValueM * 1_000_000 * (state.gorr_bps / 10000)
       : 0;
@@ -71,8 +66,6 @@ function useDerived(
     return { supply, share, distributed, estYield, cpoValueM, revenueToHolders, projPerSawit, daysLeft };
   }, [state, balance, claimable]);
 }
-
-/* ─────────────────────────── root ─────────────────────────── */
 
 export default function InvestorDashboard() {
   const { clickRef, publicKey, connected, ready, connect, disconnect } =
@@ -89,10 +82,8 @@ export default function InvestorDashboard() {
       setClaim({ phase: 'signing' });
       const tx = buildClaimTransaction(publicKey, state.current_distribution_epoch);
       const json = tx.toJSON();
-      // eslint-disable-next-line no-console
       console.log('[claim] epoch', state.current_distribution_epoch, 'tx.toJSON →', json);
       const res = await clickRef.send(json as unknown as object, publicKey);
-      // eslint-disable-next-line no-console
       console.log('[claim] send() result →', res);
       const r = res as { transactionHash?: string; deployHash?: string } | undefined;
       const hash = r?.transactionHash || r?.deployHash;
@@ -106,7 +97,6 @@ export default function InvestorDashboard() {
         setClaim({ phase: 'error', message: `Not submitted — ${detail}` });
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('[claim] send() threw →', e);
       setClaim({ phase: 'error', message: String(e instanceof Error ? e.message : e) });
     }
@@ -114,12 +104,10 @@ export default function InvestorDashboard() {
 
   return (
     <div className="min-h-screen bg-bg-2/40">
-      {/* top bar */}
       <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-20 w-full max-w-content items-center justify-between gap-4 px-5 sm:px-8">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/sawit-fi-icon-black.svg" alt="" className="h-11 w-11" />
               <span className="font-display text-[19px] tracking-tightish text-ink">
                 <span className="font-semibold">Sawit</span>
@@ -220,12 +208,9 @@ export default function InvestorDashboard() {
   );
 }
 
-/* ─────────────────────────── connect gate ─────────────────────────── */
-
 function ConnectGate({ ready, onConnect }: { ready: boolean; onConnect: () => void }) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-content flex-col items-center justify-center px-5 py-20 text-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/sawit-fi-icon-black.svg" alt="" className="h-36 w-36" />
       <h1 className="mt-1 font-display text-3xl font-semibold tracking-tighter2 text-ink sm:text-4xl">
         Your palm-oil portfolio
@@ -247,8 +232,6 @@ function ConnectGate({ ready, onConnect }: { ready: boolean; onConnect: () => vo
     </div>
   );
 }
-
-/* ─────────────────────────── contextual dark band ─────────────────────────── */
 
 function DashboardBand({
   tab,
@@ -306,7 +289,6 @@ function DashboardBand({
   return (
     <section className="relative isolate overflow-hidden bg-ink">
       <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/hero/plantation.jpg" alt="" className="h-full w-full object-cover" />
       </div>
       <div className="mx-auto w-full max-w-content px-5 py-9 sm:px-8 sm:py-11">
@@ -335,8 +317,6 @@ function DashboardBand({
     </section>
   );
 }
-
-/* ─────────────────────────── overview ─────────────────────────── */
 
 const YIELD_STEPS = [
   { t: 'Hold SAWIT', d: 'Keep a balance in your wallet.' },
@@ -397,7 +377,6 @@ function OverviewPanel({
         </div>
       </div>
 
-      {/* aside: next action (holders) OR get started (no SAWIT yet) */}
       {hasSawit ? (
         <aside className="flex flex-col rounded-2xl border border-line bg-card p-7 shadow-card">
           <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-faint">Next action</div>
@@ -475,8 +454,6 @@ function OverviewPanel({
     </div>
   );
 }
-
-/* ─────────────────────────── yield / claim ─────────────────────────── */
 
 function YieldPanel({
   state,
@@ -567,8 +544,6 @@ function YieldPanel({
   );
 }
 
-/* ─────────────────────────── market ─────────────────────────── */
-
 function MarketPanel({ state, d }: { state: ContractState | null; d: ReturnType<typeof useDerived> }) {
   const hist = useCpoHistory();
   const stats: { label: string; value: string; sub?: string; accent?: boolean }[] = state
@@ -621,8 +596,6 @@ function MarketPanel({ state, d }: { state: ContractState | null; d: ReturnType<
     </div>
   );
 }
-
-/* ─────────────────────────── activity ─────────────────────────── */
 
 function ActivityPanel() {
   return (
@@ -687,8 +660,6 @@ function ActivityPanel() {
     </div>
   );
 }
-
-/* ─────────────────────────── shared bits ─────────────────────────── */
 
 function PanelHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
@@ -768,14 +739,14 @@ function ContractIcon({ name }: { name: string }) {
     strokeLinejoin: 'round' as const,
   };
   switch (name) {
-    case 'sawitToken': // CEP-18 token → coin
+    case 'sawitToken':
       return (
         <svg {...common}>
           <circle cx="12" cy="12" r="8.5" />
           <circle cx="12" cy="12" r="3.5" />
         </svg>
       );
-    case 'productionVault': // verified production registry → vault/database
+    case 'productionVault':
       return (
         <svg {...common}>
           <ellipse cx="12" cy="6" rx="7" ry="3" />
@@ -783,13 +754,13 @@ function ContractIcon({ name }: { name: string }) {
           <path d="M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3" />
         </svg>
       );
-    case 'tokenMinter': // mints SAWIT → spark/mint
+    case 'tokenMinter':
       return (
         <svg {...common}>
           <path d="M12 3l2.2 5.3L20 10l-5.8 1.7L12 17l-2.2-5.3L4 10l5.8-1.7z" />
         </svg>
       );
-    case 'yieldDistributor': // distributes CSPR → share/branch out
+    case 'yieldDistributor':
       return (
         <svg {...common}>
           <circle cx="6" cy="12" r="2.2" />

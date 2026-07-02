@@ -5,10 +5,6 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 
 const partners = ['Casper', 'GAPKI', 'KPBN', 'MPOB', 'FRED · IMF', 'Gemini', 'Odra'];
 
-// Desktop splits the title left↔right to flank the shrunken card. Tablet/mobile
-// don't have the horizontal room, so there both halves lift UP and stack as a
-// two-line title above the card, with the subcopy appearing below it. We track
-// viewport height so the lift scales with the screen (clears the card on any size).
 function useViewport() {
   const [vp, setVp] = useState({ isDesktop: true, h: 900 });
   useEffect(() => {
@@ -32,8 +28,6 @@ export default function HeroMorph() {
     offset: ['start start', 'end start'],
   });
 
-  // Section is 205vh → the sticky child is pinned for ~105vh.
-  // The morph runs over [0, M] and COMPLETES well before the pin releases.
   const M = 0.33;
   const width = useTransform(scrollYProgress, [0, M], ['100vw', isDesktop ? '24vw' : '70vw']);
   const height = useTransform(scrollYProgress, [0, M], ['100vh', isDesktop ? '42vh' : '30vh']);
@@ -45,8 +39,6 @@ export default function HeroMorph() {
   );
   const dark = useTransform(scrollYProgress, [0, M * 0.9], [0.66, 0.24]);
 
-  // Desktop: horizontal flank. Mobile: lift the two-line title above the card
-  // (offset scales with viewport height so it clears the card on any screen).
   const leftX = useTransform(scrollYProgress, [0, M], [0, -230]);
   const rightX = useTransform(scrollYProgress, [0, M], [0, 230]);
   const titleY = useTransform(scrollYProgress, [0, M], [0, -(vh * 0.26)]);
@@ -64,7 +56,6 @@ export default function HeroMorph() {
   return (
     <section ref={ref} className="relative h-[205vh]">
       <div className="sticky top-0 grid h-screen place-items-center overflow-hidden bg-bg">
-        {/* morphing video card (single layer, plays once then freezes) */}
         <motion.div
           style={{ width, height, borderRadius: radius, boxShadow: cardShadow }}
           className="relative z-10 overflow-hidden"
@@ -81,7 +72,6 @@ export default function HeroMorph() {
           <motion.div style={{ opacity: dark }} className="absolute inset-0 bg-ink" />
         </motion.div>
 
-        {/* split title */}
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           {isDesktop ? (
             <div className="relative mx-auto flex w-full max-w-content items-center justify-center px-5">
@@ -119,7 +109,6 @@ export default function HeroMorph() {
           )}
         </div>
 
-        {/* subcopy (appears below the card) */}
         <motion.p
           style={{ opacity: subOpacity }}
           className="absolute bottom-[16vh] left-1/2 z-20 w-full max-w-lg -translate-x-1/2 px-6 text-center font-serif text-[15px] leading-relaxed text-ink/85 sm:bottom-[9vh] sm:max-w-xl sm:text-xl"
@@ -128,7 +117,6 @@ export default function HeroMorph() {
           on-chain, driven by autonomous AI agents.
         </motion.p>
 
-        {/* scroll hint + static partner row (before scroll) */}
         <motion.div
           style={{ opacity: chromeOpacity }}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-20"

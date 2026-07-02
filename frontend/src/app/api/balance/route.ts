@@ -8,17 +8,11 @@ export const maxDuration = 120;
 
 type Bal = { balance: number; claimable_motes: string };
 
-// Real on-chain SAWIT balance + per-account claimable, read via the `read_balance`
-// bridge (Odra client). Served as a snapshot fallback when the native reader
-// isn't available (e.g. Vercel serverless). Keyed by account-hash hex; values are
-// genuine on-chain figures captured from the chain.
 const BALANCE_SNAPSHOT: Record<string, Bal> = {
-  // account 1 — holds 100 SAWIT, 25 CSPR claimable on epoch 3 (Yield-Router-funded)
   e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe: {
     balance: 100,
     claimable_motes: '25000000000',
   },
-  // deployer — holds the rest of supply, no claimable allocation
   '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec': {
     balance: 2_259_900,
     claimable_motes: '0',
@@ -94,7 +88,6 @@ export async function GET(req: Request) {
     mem.set(account, { val, at: Date.now() });
     return NextResponse.json(val);
   } catch {
-    // Live bridge unavailable (serverless) — serve the committed real snapshot.
     const snap = BALANCE_SNAPSHOT[account] ?? { balance: 0, claimable_motes: '0' };
     return NextResponse.json({ ...snap, snapshot: true });
   }

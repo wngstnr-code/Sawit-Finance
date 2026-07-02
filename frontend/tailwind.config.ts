@@ -5,16 +5,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // clean institutional white/black — ondo.finance palette, no green
         bg: '#FBFBFC',
         'bg-2': '#F4F4F6',
         card: '#FFFFFF',
         line: '#EAEAEC',
         'line-2': '#E0E0E4',
-        ink: '#0B0B0C', // near-black
+        ink: '#0B0B0C',
         muted: '#5B5D66',
         faint: '#9A9CA4',
-        // accent = deep palm green
         brand: {
           DEFAULT: '#1E7A4F',
           mid: '#2E9E68',

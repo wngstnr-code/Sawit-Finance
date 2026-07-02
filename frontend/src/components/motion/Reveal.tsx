@@ -29,7 +29,6 @@ export function Reveal({
   );
 }
 
-// Staggered children container
 const container: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },

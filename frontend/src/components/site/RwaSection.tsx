@@ -31,11 +31,8 @@ export default function RwaSection() {
       <Reveal>
         <div className="rounded-3xl border border-line bg-bg-2/60 p-3 sm:p-4">
           <div className="grid gap-3 lg:grid-cols-3">
-            {/* product card (tall, left) */}
             <div className="relative flex flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-card lg:row-span-2">
-              {/* estate photo top, fading into the card */}
               <div className="relative h-60">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/hero/buah-sawit.jpg"
                   alt="Indonesian oil-palm estate"
@@ -44,9 +41,7 @@ export default function RwaSection() {
                 <div className="absolute inset-0 bg-ink/25" />
                 <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
                 <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-ink/40 to-transparent" />
-                {/* logo badge */}
                 <div className="absolute left-6 top-6 grid h-12 w-12 place-items-center rounded-xl border border-white/60 bg-white/85 shadow-card backdrop-blur">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/sawit-fi-icon-black.svg" alt="" className="h-7 w-7" />
                 </div>
               </div>
@@ -76,7 +71,6 @@ export default function RwaSection() {
               </div>
             </div>
 
-            {/* verified value + chart (wide, top-right) */}
             <div className="rounded-2xl border border-line bg-card p-7 shadow-card lg:col-span-2">
               <div className="flex items-start justify-between">
                 <div>
@@ -105,7 +99,6 @@ export default function RwaSection() {
               </div>
             </div>
 
-            {/* CPO recorded (bottom-right-left) */}
             <div className="rounded-2xl border border-line bg-card p-7 shadow-card">
               <div className="text-[12px] text-faint">CPO recorded</div>
               <div className="mt-1 font-display text-4xl font-semibold tracking-tighter2 text-ink">
@@ -117,7 +110,6 @@ export default function RwaSection() {
               </p>
             </div>
 
-            {/* oracle reputation + bars (bottom-right-right) */}
             <div className="rounded-2xl border border-line bg-card p-7 shadow-card">
               <div className="text-[12px] text-faint">Oracle reputation</div>
               <div className="mt-1 font-display text-4xl font-semibold tracking-tighter2 text-ink">
@@ -138,7 +130,6 @@ export default function RwaSection() {
             </div>
           </div>
 
-          {/* footnote row: SAWIT supply */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card px-7 py-5 shadow-card">
             <span className="font-display text-lg font-semibold text-ink">
               {s ? fmtAmount(fromBaseUnits(s.total_sawit_supply, SAWIT_DECIMALS)) : '—'}{' '}

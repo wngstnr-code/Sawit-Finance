@@ -28,7 +28,6 @@ export default function SiteNav() {
         }`}
       >
         <Link href="/" className="flex items-center gap-2.5 pl-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/sawit-fi-icon-white.svg" alt="" className="h-10 w-10 sm:h-11 sm:w-11" />
           <span className="whitespace-nowrap font-display text-[18px] tracking-tightish text-white sm:text-[19px]">
             <span className="font-semibold">Sawit</span>
@@ -36,7 +35,6 @@ export default function SiteNav() {
           </span>
         </Link>
 
-        {/* desktop links */}
         <div className="hidden items-center gap-8 md:flex">
           {links.map((l) => (
             <a

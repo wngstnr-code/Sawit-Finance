@@ -26,7 +26,6 @@ export default function AccessSection() {
       <Reveal>
         <div className="overflow-hidden rounded-3xl border border-line bg-card shadow-card-lg">
           <div className="grid gap-10 p-6 sm:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
-            {/* left: pitch */}
             <div className="flex flex-col">
               <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand">
                 <span className="h-px w-5 bg-brand/40" />
@@ -59,7 +58,6 @@ export default function AccessSection() {
               </p>
             </div>
 
-            {/* right: 3 steps as a connected timeline — line only spans badge→badge */}
             <ol className="flex flex-col justify-center">
               {STEPS.map((s, i) => (
                 <li key={s.n} className="flex gap-5 pb-9 last:pb-0">

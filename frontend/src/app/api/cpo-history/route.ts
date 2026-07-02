@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 
-// Real palm-oil price history from FRED series PPOILUSDM ("Global price of Palm
-// Oil", IMF data, USD/metric ton, monthly). Free, keyless CSV — the same
-// authoritative series the Sawit Finance oracle anchors on (agents/cpo_price.py).
 const FRED_CSV_URL =
   'https://fred.stlouisfed.org/graph/fredgraph.csv?id=PPOILUSDM';
 
-const MONTHS = 60; // ~5 years of monthly observations
+const MONTHS = 60;
 
 type Point = { date: string; price: number };
 let cache: { at: number; data: Point[] } | null = null;
-const TTL_MS = 6 * 60 * 60 * 1000; // 6h
+const TTL_MS = 6 * 60 * 60 * 1000;
 
 async function fetchSeries(): Promise<Point[]> {
   const res = await fetch(FRED_CSV_URL, {
@@ -19,11 +16,11 @@ async function fetchSeries(): Promise<Point[]> {
   });
   if (!res.ok) throw new Error(`FRED HTTP ${res.status}`);
   const text = await res.text();
-  const rows = text.trim().split('\n').slice(1); // drop header
+  const rows = text.trim().split('\n').slice(1);
   const pts: Point[] = [];
   for (const row of rows) {
     const [date, raw] = row.split(',');
-    if (!raw || raw === '.' || raw === '') continue; // FRED missing marker
+    if (!raw || raw === '.' || raw === '') continue;
     const price = Number(raw);
     if (Number.isFinite(price)) pts.push({ date, price });
   }

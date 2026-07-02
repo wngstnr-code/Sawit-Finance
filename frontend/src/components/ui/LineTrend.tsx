@@ -1,6 +1,3 @@
-// Elegant line chart driven by real data (smooth curve + soft area + end marker).
-// Pass `data` (a numeric series, e.g. monthly CPO prices). Falls back to a quiet
-// loading state when the series isn't available yet.
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';
@@ -27,7 +24,6 @@ export function LineTrend({
   const H = 80;
 
   if (!data || data.length < 2) {
-    // quiet loading state — faint baseline only, no fabricated curve
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className={`h-full w-full ${className}`} preserveAspectRatio="none">
         {[20, 40, 60].map((y) => (
@@ -59,7 +55,6 @@ export function LineTrend({
         </linearGradient>
       </defs>
 
-      {/* faint baseline grid */}
       {[20, 40, 60].map((y) => (
         <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="#ECEAE6" strokeWidth="0.5" />
       ))}
@@ -75,7 +70,6 @@ export function LineTrend({
         vectorEffect="non-scaling-stroke"
       />
 
-      {/* latest value marker */}
       <circle cx={last.x} cy={last.y} r="3.4" fill="#1E7A4F" opacity="0.16" />
       <circle cx={last.x} cy={last.y} r="1.7" fill="#1E7A4F" vectorEffect="non-scaling-stroke" />
     </svg>

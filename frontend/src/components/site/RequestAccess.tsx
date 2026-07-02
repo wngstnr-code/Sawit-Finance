@@ -31,7 +31,6 @@ export default function RequestAccess({
 
   function close() {
     setOpen(false);
-    // reset after the close transition so a reopened modal is fresh
     setTimeout(() => {
       setPhase('idle');
       setError('');
@@ -42,7 +41,7 @@ export default function RequestAccess({
     e.preventDefault();
     const form = e.currentTarget;
     const data = Object.fromEntries(new FormData(form).entries());
-    if ((data._honey as string)?.length) return; // honeypot
+    if ((data._honey as string)?.length) return;
     setPhase('sending');
     setError('');
     try {
@@ -96,7 +95,6 @@ export default function RequestAccess({
             className="max-h-[90dvh] w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-line bg-card shadow-card-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* header */}
             <div className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-card p-6">
               <div>
                 <div className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-brand">
@@ -145,7 +143,6 @@ export default function RequestAccess({
                   allocation; a licensed operator will onboard you.
                 </p>
 
-                {/* honeypot */}
                 <input type="text" name="_honey" tabIndex={-1} autoComplete="off" className="hidden" />
 
                 <div className="grid gap-4 sm:grid-cols-2">

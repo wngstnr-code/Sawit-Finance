@@ -20,7 +20,6 @@ function loadCache(): Cache | null {
       mem = JSON.parse(readFileSync(CACHE, 'utf8'));
       return mem;
     } catch {
-      /* ignore */
     }
   }
   return null;
@@ -31,7 +30,6 @@ function saveCache(state: Record<string, unknown>) {
   try {
     writeFileSync(CACHE, JSON.stringify(mem));
   } catch {
-    /* ignore */
   }
 }
 
@@ -88,7 +86,6 @@ function refreshInBackground() {
 export async function GET() {
   const cached = loadCache();
 
-  // Serve cached instantly; refresh in the background if stale.
   if (cached) {
     if (Date.now() - cached.at > STALE_MS) refreshInBackground();
     return NextResponse.json({
@@ -98,15 +95,11 @@ export async function GET() {
     });
   }
 
-  // No cache yet — do the (slow) first live read.
   try {
     const state = await runBridge();
     saveCache(state);
     return NextResponse.json({ state, readAt: Date.now() });
   } catch {
-    // Live bridge unavailable (e.g. serverless/Vercel can't run the native
-    // read_state binary) — serve the committed real on-chain snapshot so the
-    // genuine numbers still render instead of failing.
     return NextResponse.json({ state: STATE_SNAPSHOT, snapshot: true });
   }
 }

@@ -4,7 +4,6 @@ export const txUrl = (hash: string) => `${NETWORK.explorer}/transaction/${hash}`
 export const pkgUrl = (hash: string) =>
   `${NETWORK.explorer}/contract-package/${hash}`;
 
-// The full economic loop executed on Casper Testnet (see README).
 export const LOOP_STEPS = [
   {
     n: 1,

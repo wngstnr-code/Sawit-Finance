@@ -3,11 +3,6 @@ import { Space_Grotesk, Fraunces, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 
-// Free stand-ins for the licensed brand fonts:
-//   --font-display / --font-sans  ← "Gelix"   (geometric sans)  → Space Grotesk
-//   --font-serif                  ← "Arizona" (flare serif)     → Fraunces
-// To use the real fonts, drop the .woff2 files in public/fonts/ and swap these
-// for next/font/local definitions pointing at them (CSS var names stay the same).
 const display = Space_Grotesk({
   variable: '--font-display',
   subsets: ['latin'],
@@ -37,7 +32,6 @@ export default function RootLayout({
       className={`${display.variable} ${serif.variable} ${sans.variable} ${mono.variable} h-full`}
     >
       <body className="min-h-full">
-        {/* react-modal (used by CSPR.click UI) calls setAppElement('#root') */}
         <div id="root">
           <Providers>{children}</Providers>
         </div>

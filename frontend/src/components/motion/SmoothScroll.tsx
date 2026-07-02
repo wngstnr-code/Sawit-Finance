@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import Lenis from 'lenis';
 
-// Buttery momentum scrolling, like ondo.finance.
 export default function SmoothScroll({
   children,
 }: {
