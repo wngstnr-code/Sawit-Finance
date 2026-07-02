@@ -1,46 +1,36 @@
-# ─── OS / editor ───
 .DS_Store
 Thumbs.db
 *.swp
 *~
 .~lock.*
 
-# ─── Secrets / env — NEVER commit ───
-# Ignore every env file, including the *.example templates.
 .env
 .env.*
 **/.env
 **/.env.*
 
-# Keys & credentials
 *.pem
 *.key
 keys/
 secret_key*
 *.secret
 
-# ─── Temp / logs ───
 *.tmp
 *.log
 
-# ─── Python ───
 .venv/
 __pycache__/
 *.pyc
 
-# ─── Node ───
 node_modules/
 package-lock.json
 
-# ─── Next.js (frontend) ───
 .next/
 frontend/.next/
 frontend/out/
 
-# ─── Rust build artifacts (Cargo.lock IS committed — reproducible builds) ───
 /target/
 
-# ─── Claude Code / AI tooling (not part of the project) ───
 .claude/
 .claire/
 .auto-memory/

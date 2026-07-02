@@ -1,9 +1,4 @@
 #!/bin/bash
-# Sawit Finance — Build contract wasm for Casper deployment
-# =====================================================
-# `cargo odra build` assumes a single-crate project; Sawit Finance uses one crate per
-# contract, so we build each contract's wasm directly and place it in wasm/ where
-# Odra's livenet deployer looks for it (wasm/<ContractName>.wasm).
 
 set -e
 
@@ -11,7 +6,6 @@ CARGO="${CARGO:-$HOME/.cargo/bin/cargo}"
 TOOLCHAIN="nightly-2026-01-01"
 TARGET="wasm32-unknown-unknown"
 
-# crate package | build-contract bin | Odra contract (struct) name
 CONTRACTS=(
   "production-vault|production_vault_build_contract|SawitProductionVault"
   "sawit-token|sawit_token_build_contract|SawitToken"
@@ -36,8 +30,6 @@ for entry in "${CONTRACTS[@]}"; do
   dst="wasm/$name.wasm"
   cp "$src" "$dst"
 
-  # Casper's Wasm preprocessor rejects bulk-memory (memory.copy/fill) and
-  # sign-extension ops that nightly LLVM emits. Lower them to plain loops/ops.
   command -v wasm-strip >/dev/null 2>&1 && wasm-strip "$dst" || true
   command -v wasm-opt   >/dev/null 2>&1 && \
     wasm-opt --enable-bulk-memory --llvm-memory-copy-fill-lowering --signext-lowering -Oz "$dst" -o "$dst" || true
