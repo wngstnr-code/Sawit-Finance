@@ -1,31 +1,5 @@
 #!/usr/bin/env python3
-"""
-Sawit Finance — Casper MCP Server.
-
-Exposes the protocol's live on-chain state (read from the four Odra contracts on
-Casper Testnet) to any MCP-compatible AI agent as standardized *tools*. This is
-the Casper AI Toolkit pattern: instead of bespoke API glue, an LLM (Claude, etc.)
-can query SAWIT chain state, oracle reputation, holder positions and the live
-palm-oil price through MCP tool calls.
-
-The on-chain reads go through the same `read_state` / `read_balance` bridges the
-frontend uses (CSPR.cloud can't see Odra's internal state, so we read it directly
-via Odra's livenet client). Reads are served from the bridge's cache for snappy
-tool calls; `refresh_protocol_state` forces a fresh live read.
-
-Run (stdio transport):
-    ./.venv/bin/python agents/mcp_server.py
-
-Connect from Claude Desktop — add to claude_desktop_config.json:
-    {
-      "mcpServers": {
-        "sawit-finance": {
-          "command": "/ABSOLUTE/PATH/.venv/bin/python",
-          "args": ["/ABSOLUTE/PATH/agents/mcp_server.py"]
-        }
-      }
-    }
-"""
+"""Sawit Finance — Casper MCP Server: exposes live on-chain state from the four Odra contracts to MCP-compatible AI agents as standardized tools."""
 from __future__ import annotations
 
 import csv
@@ -40,7 +14,6 @@ import urllib.request
 
 from mcp.server.fastmcp import FastMCP
 
-# ─── paths / config ───
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_FILE = os.path.join(ROOT, ".env")
 STATE_CACHE = os.path.join(ROOT, "frontend", ".state-cache.json")
@@ -65,9 +38,7 @@ ECONOMIC_LOOP = [
 
 mcp = FastMCP("Sawit Finance")
 
-# ─── helpers ───
 _mem: dict = {}
-
 
 def _load_env(path: str) -> dict:
     out = {}
@@ -82,7 +53,6 @@ def _load_env(path: str) -> dict:
             out[k.strip()] = v.strip()
     return out
 
-
 def _run_bridge(bin_path: str, extra_env: dict, marker: str) -> dict:
     """Run a read bridge binary and parse its `<MARKER> {json}` line."""
     env = {**os.environ, **_load_env(ENV_FILE), **extra_env}
@@ -92,15 +62,12 @@ def _run_bridge(bin_path: str, extra_env: dict, marker: str) -> dict:
             return json.loads(line[len(marker) + 1:])
     raise RuntimeError(f"{marker} not found in bridge output")
 
-
-_REFRESH_TTL = 90          # seconds — serve cache instantly, refresh in background when older
+_REFRESH_TTL = 90
 _refresh_lock = threading.Lock()
 _refreshing = False
 
-
 def _live_read() -> dict:
-    """Read all four contracts live, update the in-memory cache, and persist to the
-    shared `.state-cache.json` file (same format the frontend /api/state uses)."""
+    """Read all four contracts live, update the cache, and persist to .state-cache.json."""
     v = _run_bridge(READ_STATE_BIN, {}, "SAWIT_STATE_JSON")
     _mem["state"] = {"v": v, "at": time.time()}
     try:
@@ -109,7 +76,6 @@ def _live_read() -> dict:
     except OSError:
         pass
     return v
-
 
 def _refresh_in_background() -> None:
     """Kick off one live read in a daemon thread (no-op if one is already running)."""
@@ -131,28 +97,23 @@ def _refresh_in_background() -> None:
 
     threading.Thread(target=_worker, daemon=True).start()
 
-
 def _state(refresh: bool = False) -> dict:
-    """Protocol state. Serves the cached on-chain read instantly for snappy tool
-    calls and self-refreshes in the background once the cache passes _REFRESH_TTL;
-    refresh=True forces a fresh ~60–90s live read via the bridge."""
+    """Protocol state; serves the cache instantly and self-refreshes past _REFRESH_TTL, refresh=True forces a fresh live read."""
     if refresh:
         return _live_read()
 
-    # In-memory cache (fast path) — serve now, refresh in the background if stale.
     cached = _mem.get("state")
     if cached:
         if time.time() - cached["at"] > _REFRESH_TTL:
             _refresh_in_background()
         return cached["v"]
 
-    # Fall back to the shared cache file; refresh in the background if stale.
     if os.path.exists(STATE_CACHE):
         try:
             with open(STATE_CACHE) as f:
                 blob = json.load(f)
             v = blob.get("state", {})
-            at = blob.get("at", 0) / 1000  # file stores ms
+            at = blob.get("at", 0) / 1000
             _mem["state"] = {"v": v, "at": at}
             if time.time() - at > _REFRESH_TTL:
                 _refresh_in_background()
@@ -160,9 +121,7 @@ def _state(refresh: bool = False) -> dict:
         except (OSError, json.JSONDecodeError):
             pass
 
-    # No cache at all — do the (slow) first live read synchronously.
     return _live_read()
-
 
 def _account_hash(public_key_hex: str) -> str:
     """Casper account-hash = blake2b256( algo_name + 0x00 + key_bytes )."""
@@ -174,13 +133,9 @@ def _account_hash(public_key_hex: str) -> str:
     h = hashlib.blake2b(algo + b"\x00" + key, digest_size=32)
     return h.hexdigest()
 
-
-# ─── tools ───
 @mcp.tool()
 def get_protocol_state() -> dict:
-    """Live on-chain state of the Sawit Finance protocol on Casper Testnet:
-    SAWIT supply, verified CPO tonnage + price, GORR, oracle reputation, epochs,
-    and the funded distribution / claim window. Read from the four Odra contracts."""
+    """Live on-chain state of the protocol: SAWIT supply, CPO tonnage/price, GORR, oracle reputation, epochs, and the claim window."""
     s = _state()
     price = s.get("latest_cpo_price_cents", 0) / 100
     return {
@@ -198,12 +153,9 @@ def get_protocol_state() -> dict:
         "yield_distributed_cspr": int(s.get("total_distributed_cspr", "0")) / 1e9,
     }
 
-
 @mcp.tool()
 def get_oracle_reputation() -> dict:
-    """The AI oracle's on-chain reputation — a rolling accuracy score (0–100) over
-    all verified submissions, publicly readable via get_oracle_reputation(). This
-    is the trust-minimized oracle reputation the buildathon judging asks for."""
+    """The AI oracle's on-chain reputation — a rolling accuracy score (0-100) over all verified submissions."""
     s = _state()
     score = s.get("oracle_reputation", 0)
     if score >= 90:
@@ -221,11 +173,9 @@ def get_oracle_reputation() -> dict:
         "latest_validation_score": f"{s.get('latest_validation_score')}/100",
     }
 
-
 @mcp.tool()
 def get_palm_oil_price() -> dict:
-    """Live real-world palm-oil price the oracle anchors on — FRED series
-    PPOILUSDM (IMF Global price of Palm Oil, USD/metric ton, monthly). Free, no key."""
+    """Live palm-oil price the oracle anchors on — FRED PPOILUSDM (IMF, USD/metric ton)."""
     with urllib.request.urlopen(FRED_CSV, timeout=20) as r:
         text = r.read().decode()
     rows = list(csv.reader(io.StringIO(text)))[1:]
@@ -238,12 +188,9 @@ def get_palm_oil_price() -> dict:
         "observations": len(obs),
     }
 
-
 @mcp.tool()
 def get_account_position(public_key: str) -> dict:
-    """A holder's live position: SAWIT balance and claimable CSPR for the current
-    distribution epoch, read on-chain for the given Casper public key (01.. ed25519
-    or 02.. secp256k1)."""
+    """A holder's live position: SAWIT balance and claimable CSPR for the current epoch, for the given Casper public key."""
     acct = _account_hash(public_key)
     v = _run_bridge(
         READ_BALANCE_BIN, {"BALANCE_ACCOUNT": f"account-hash-{acct}"}, "SAWIT_BALANCE_JSON"
@@ -256,35 +203,27 @@ def get_account_position(public_key: str) -> dict:
         "epoch": v.get("epoch"),
     }
 
-
 @mcp.tool()
 def get_contracts() -> dict:
-    """The four deployed Sawit Finance contracts on Casper Testnet (upgradable Odra
-    packages) with cspr.live explorer links."""
+    """The four deployed contracts on Casper Testnet with cspr.live links."""
     return {
         name: {"package_hash": h, "explorer": f"{EXPLORER}/contract-package/{h}"}
         for name, h in CONTRACTS.items()
     }
 
-
 @mcp.tool()
 def get_economic_loop() -> list:
-    """The full economic loop already executed live on Casper Testnet —
-    record production → mint SAWIT → fund yield → KYC-gated claim — with the real
-    transaction hashes and explorer links for verification."""
+    """The full economic loop executed live on Casper Testnet with real tx hashes and explorer links."""
     return [
         {**step, "explorer": f"{EXPLORER}/transaction/{step['tx']}"}
         for step in ECONOMIC_LOOP
     ]
 
-
 @mcp.tool()
 def refresh_protocol_state() -> dict:
-    """Force a fresh live read of all four contracts from the chain (~60–90s) and
-    update the cache. Use when you need the very latest on-chain state."""
+    """Force a fresh live read of all four contracts (~60-90s) and update the cache."""
     _state(refresh=True)
     return get_protocol_state()
-
 
 if __name__ == "__main__":
     mcp.run()

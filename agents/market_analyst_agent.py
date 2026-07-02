@@ -1,27 +1,4 @@
-"""
-Sawit Finance — Market Analyst Agent
-=================================
-Autonomous AI agent that reads all 4 Sawit Finance contract states via
-CSPR.cloud REST API (Casper MCP-compatible), feeds the data to Gemini AI,
-and produces actionable market intelligence reports.
-
-Responsibilities:
-  - Monitor oracle reputation score — alert if declining
-  - Analyze CPO price trends across epochs
-  - Detect unclaimed yield windows approaching expiry
-  - Recommend GORR (Gross Overriding Royalty Rate) adjustments
-  - Flag anomalies in production data patterns
-
-Why this agent matters:
-  Unlike the Oracle Agent (data collection) and Yield Router (distribution),
-  the Market Analyst acts as a strategic brain — using AI reasoning to
-  interpret on-chain data and guide human operators.
-
-Architecture:
-  CSPR.cloud REST API → read contract state
-  → Gemini AI reasoning → structured report
-  → logged + available for operator dashboard
-"""
+"""Sawit Finance — Market Analyst Agent: reads all 4 contract states via CSPR.cloud, uses Gemini AI to interpret trends and recommend GORR adjustments."""
 
 import asyncio
 import json
@@ -42,13 +19,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("sawit-analyst")
 
-# ─── CONFIG ───
-
 CSPR_CLOUD_API = "https://api.testnet.cspr.cloud"
 
-# Read-only Rust bridge that reads Odra's `state` dictionary via the livenet
-# client (CSPR.cloud's named-keys endpoint can't see Odra state). Built with:
-#   cargo build -p sawit-deploy --bin read_state --features livenet --release
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READ_STATE_BIN = os.getenv(
     "READ_STATE_BIN", str(REPO_ROOT / "target" / "release" / "read_state")
@@ -68,28 +40,18 @@ MARKET_ANALYST_SECRET_KEY = os.getenv("MARKET_ANALYST_SECRET_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-# How often to run analysis (default: every 6 hours)
 ANALYSIS_INTERVAL_SECONDS = int(os.getenv("ANALYSIS_INTERVAL_SECONDS", "21600"))
 
-# Closed-loop autonomy: when ON, the agent autonomously applies its GORR
-# recommendation on-chain via TokenMinter.update_config(). When OFF, it only reports.
 AUTONOMY_MODE = os.getenv("AUTONOMY_MODE", "off").lower() == "on"
-# Safety rail: AI is never allowed to move GORR by more than this many bps per cycle,
-# nor outside the absolute [MIN, MAX] band. Prevents a hallucinated swing from
-# draining holder yield or over-issuing.
 MAX_GORR_CHANGE_BPS = int(os.getenv("MAX_GORR_CHANGE_BPS", "100"))
-MIN_GORR_BPS = int(os.getenv("MIN_GORR_BPS", "100"))    # 1.0% floor
-MAX_GORR_BPS = int(os.getenv("MAX_GORR_BPS", "1000"))   # 10.0% ceiling
+MIN_GORR_BPS = int(os.getenv("MIN_GORR_BPS", "100"))
+MAX_GORR_BPS = int(os.getenv("MAX_GORR_BPS", "1000"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-
-# ─── DATA STRUCTURES ───
-
 @dataclass
 class ContractState:
-    # ProductionVault
     epoch_count: int
     oracle_reputation: int
     oracle_submission_count: int
@@ -99,26 +61,19 @@ class ContractState:
     latest_validation_score: int
     latest_tons_cpo: int
 
-    # YieldDistributor
     current_distribution_epoch: int
     latest_epoch_funded: bool
     latest_epoch_claim_deadline_ms: int
     total_distributed_cspr: str
 
-    # TokenMinter
     total_tokens_minted: str
     gorr_bps: int
     token_rate: int
 
-    # SawitToken
     total_sawit_supply: str
 
-
-# ─── CSPR.CLOUD STATE READER ───
-
 def _demo_state() -> ContractState:
-    """Fallback state if the on-chain read is unavailable (read bin not built,
-    node unreachable, etc.). Labelled clearly so it's never mistaken for live data."""
+    """Fallback state (clearly labelled) if the on-chain read is unavailable."""
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     return ContractState(
         epoch_count=3,
@@ -139,18 +94,14 @@ def _demo_state() -> ContractState:
         total_sawit_supply="6750000000000000",
     )
 
-
 def _read_state_blocking() -> Optional[ContractState]:
-    """Invoke the read_state Rust bridge and parse its JSON line. Returns None on
-    any failure so the caller can fall back to demo state."""
+    """Invoke the read_state Rust bridge and parse its JSON; returns None on failure."""
     if not Path(READ_STATE_BIN).exists():
         log.warning(f"[ANALYST] read bin not found at {READ_STATE_BIN} — "
                     "build it: cargo build -p sawit-deploy --bin read_state "
                     "--features livenet --release")
         return None
 
-    # The bridge needs the livenet env vars (node, chain, secret key) from the
-    # project-root .env — agents/.env doesn't carry those.
     env = {**os.environ, **dotenv_values(LIVENET_ENV_FILE)}
     try:
         proc = subprocess.run(
@@ -169,11 +120,8 @@ def _read_state_blocking() -> Optional[ContractState]:
                 f"{proc.stderr.strip()[:200]} — using demo state")
     return None
 
-
 async def read_contract_state(session: aiohttp.ClientSession) -> ContractState:
-    """Read live state from all 4 Sawit Finance contracts via the read_state Rust
-    bridge (reads Odra's `state` dictionary through the livenet client). Falls
-    back to clearly-labelled demo state if the bridge is unavailable."""
+    """Read live state from all 4 contracts via the read_state bridge; falls back to labelled demo state."""
     log.info("[ANALYST] Reading live on-chain state via read_state bridge...")
     state = await asyncio.to_thread(_read_state_blocking)
     if state is None:
@@ -182,20 +130,8 @@ async def read_contract_state(session: aiohttp.ClientSession) -> ContractState:
     log.info("[ANALYST] Live state read from chain ✅")
     return state
 
-
-# ─── GEMINI ANALYSIS ───
-
 async def run_gemini_analysis(state: ContractState) -> dict:
-    """
-    Feed contract state to Gemini AI for strategic market analysis.
-
-    Gemini reasons about:
-    - Oracle reliability trends
-    - CPO market conditions
-    - Yield distribution health
-    - GORR optimization
-    - Risk alerts
-    """
+    """Feed contract state to Gemini AI for strategic market analysis."""
     if not GEMINI_API_KEY:
         log.warning("[GEMINI] No API key — returning mock analysis")
         return _mock_analysis(state)
@@ -204,9 +140,6 @@ async def run_gemini_analysis(state: ContractState) -> dict:
     total_sawit = int(state.total_sawit_supply) / 1e9
     total_distributed = int(state.total_distributed_cspr) / 1e9
 
-    # A distribution epoch only exists once one has been funded on-chain. Until
-    # then there is no claim deadline — don't compute (and feed Gemini) a bogus
-    # negative "days remaining" from a zero timestamp.
     has_distribution = (
         state.current_distribution_epoch > 0
         and state.latest_epoch_claim_deadline_ms > 0
@@ -228,9 +161,6 @@ async def run_gemini_analysis(state: ContractState) -> dict:
             "(none funded, no claim window open, 0 CSPR distributed)."
         )
 
-    # The protocol bootstraps in sequence: record production -> mint SAWIT ->
-    # distribute yield. Empty minting/distribution during early epochs is the
-    # expected next step, not a fault — tell Gemini so it frames it correctly.
     is_bootstrapping = total_sawit == 0 and total_distributed == 0
     if is_bootstrapping:
         phase_note = (
@@ -319,7 +249,6 @@ gorr_recommendation_bps: your recommended GORR (can be same as current if no cha
         log.error(f"[GEMINI] Analysis failed: {e}")
         return _mock_analysis(state)
 
-
 def _mock_analysis(state: ContractState) -> dict:
     """Fallback analysis when Gemini is unavailable."""
     has_distribution = (
@@ -354,29 +283,16 @@ def _mock_analysis(state: ContractState) -> dict:
         "operator_actions": actions,
     }
 
-
-# ─── CLOSED-LOOP: AUTONOMOUS ON-CHAIN ACTION ───
-
 def clamp_gorr(recommended: int, current: int) -> tuple[int, Optional[str]]:
-    """
-    Apply safety rails to the AI's GORR recommendation.
-
-    Returns: (safe_gorr, reason_if_clamped)
-
-    The agent reasons freely, but we never let a single AI cycle move GORR
-    beyond MAX_GORR_CHANGE_BPS or outside the [MIN, MAX] absolute band.
-    This keeps a hallucinated recommendation from harming holders.
-    """
+    """Apply safety rails to the AI's GORR recommendation; returns (safe_gorr, reason_if_clamped)."""
     reason = None
     safe = recommended
 
-    # Cap the per-cycle change
     delta = recommended - current
     if abs(delta) > MAX_GORR_CHANGE_BPS:
         safe = current + (MAX_GORR_CHANGE_BPS if delta > 0 else -MAX_GORR_CHANGE_BPS)
         reason = f"change capped to ±{MAX_GORR_CHANGE_BPS} bps (AI wanted {delta:+d})"
 
-    # Enforce absolute band
     if safe < MIN_GORR_BPS:
         safe = MIN_GORR_BPS
         reason = f"clamped up to floor {MIN_GORR_BPS} bps"
@@ -386,21 +302,12 @@ def clamp_gorr(recommended: int, current: int) -> tuple[int, Optional[str]]:
 
     return safe, reason
 
-
 async def apply_gorr_onchain(
     session: aiohttp.ClientSession,
     current_gorr: int,
     recommended_gorr: int,
 ) -> Optional[str]:
-    """
-    Closed-loop step: autonomously apply the GORR recommendation on-chain by
-    calling TokenMinter.update_config(new_gorr_bps).
-
-    This is what makes the Market Analyst a true agentic actor:
-      READ chain state → REASON with Gemini → WRITE back to chain.
-
-    Returns the deploy hash if an update was submitted, else None.
-    """
+    """Closed-loop step: apply the GORR recommendation on-chain via TokenMinter.update_config(); returns the deploy hash or None."""
     if recommended_gorr == current_gorr:
         log.info(f"[AUTONOMY] GORR unchanged at {current_gorr} bps — no action")
         return None
@@ -422,10 +329,6 @@ async def apply_gorr_onchain(
 
     log.info(f"[AUTONOMY] 🤖 Autonomously updating GORR {current_gorr} → {safe_gorr} bps on-chain...")
 
-    # Real on-chain write: the agent signs and broadcasts
-    # TokenMinter.update_config(new_gorr_bps=safe_gorr) via the `set_gorr` livenet
-    # binary (the deployer key is the minter's authority). The binary prints the
-    # executed transaction hash — that hash is the agent's decision, on cspr.live.
     if not os.path.exists(SET_GORR_BIN):
         log.error(
             f"[AUTONOMY] set_gorr bin not found at {SET_GORR_BIN} — build it: "
@@ -455,9 +358,6 @@ async def apply_gorr_onchain(
     else:
         log.info("[AUTONOMY] ✅ GORR updated on-chain (tx hash not parsed from output)")
     return deploy_hash
-
-
-# ─── REPORT FORMATTER ───
 
 def format_report(state: ContractState, analysis: dict, timestamp: str) -> str:
     """Format the analysis into a human-readable report."""
@@ -522,9 +422,6 @@ def format_report(state: ContractState, analysis: dict, timestamp: str) -> str:
     report += "\n╚══════════════════════════════════════════════════════════════╝"
     return report
 
-
-# ─── MAIN ANALYST LOOP ───
-
 async def run_analysis_cycle():
     """Run one analysis cycle: read state → Gemini analysis → report."""
     now = datetime.now(timezone.utc)
@@ -533,31 +430,25 @@ async def run_analysis_cycle():
     log.info(f"=== Sawit Finance Market Analyst — {timestamp} ===")
 
     async with aiohttp.ClientSession() as session:
-        # 1. Read all contract state via CSPR.cloud
         state = await read_contract_state(session)
         log.info(f"[ANALYST] Oracle reputation: {state.oracle_reputation}/100")
         log.info(f"[ANALYST] Epochs recorded: {state.epoch_count}")
         log.info(f"[ANALYST] Latest CPO price: ${state.latest_cpo_price_cents/100:.2f}/ton")
 
-        # 2. Gemini AI analysis
         analysis = await run_gemini_analysis(state)
 
-        # 3. Format and print report
         report = format_report(state, analysis, timestamp)
         print(report)
 
-        # 4. Closed loop — autonomously act on the GORR recommendation on-chain
         recommended_gorr = int(analysis.get("gorr_recommendation_bps", state.gorr_bps))
         gorr_deploy = await apply_gorr_onchain(session, state.gorr_bps, recommended_gorr)
 
-        # 5. Return structured result (for integration with operator dashboard)
         return {
             "timestamp": timestamp,
             "state": state.__dict__,
             "analysis": analysis,
             "gorr_action_deploy": gorr_deploy,
         }
-
 
 async def main():
     """Run market analyst agent on a regular interval."""
@@ -575,7 +466,6 @@ async def main():
 
         log.info(f"[ANALYST] Next analysis in {ANALYSIS_INTERVAL_SECONDS // 3600} hours...")
         await asyncio.sleep(ANALYSIS_INTERVAL_SECONDS)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
