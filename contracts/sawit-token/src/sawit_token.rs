@@ -1,16 +1,3 @@
-// Sawit Finance — SawitToken (CEP-18 Fungible Token)
-// ===============================================
-// SAWIT is the yield-bearing token of the Sawit Finance protocol.
-// Each SAWIT token represents a fractional claim on Indonesian palm oil
-// production revenue (CPO - Crude Palm Oil).
-//
-// Token mechanics:
-//   - Minted by TokenMinter proportional to verified CPO production
-//   - Formula: tokens = tons_cpo × token_rate × (gorr_bps / 10,000)
-//   - Holders receive monthly CSPR yield distributions
-//   - KYC-gated transfers (checked against ProductionVault whitelist)
-//
-// CEP-18 is the Casper Network standard for fungible tokens (ERC-20 equivalent).
 
 use odra::prelude::*;
 use odra::casper_types::U256;
@@ -55,7 +42,7 @@ pub struct SawitToken {
     balances: Mapping<Address, U256>,
     allowances: Mapping<(Address, Address), U256>,
     authority: Var<Address>,
-    minter: Var<Address>,           // TokenMinter contract address
+    minter: Var<Address>,
     transfers_paused: Var<bool>,
     total_epochs_minted: Var<u64>,
 }
@@ -73,8 +60,6 @@ impl SawitToken {
         self.transfers_paused.set(false);
         self.total_epochs_minted.set(0u64);
     }
-
-    // ─── CEP-18 STANDARD FUNCTIONS ───
 
     pub fn transfer(&mut self, recipient: &Address, amount: &U256) {
         if self.transfers_paused.get_or_default() {
@@ -106,8 +91,6 @@ impl SawitToken {
         });
     }
 
-    // ─── MINTING (TokenMinter only) ───
-
     pub fn mint(&mut self, to: &Address, amount: &U256, epoch_number: u64) {
         if self.env().caller() != self.minter.get().unwrap() {
             self.env().revert(TokenError::UnauthorizedMinter)
@@ -133,8 +116,6 @@ impl SawitToken {
         });
     }
 
-    // ─── ADMIN ───
-
     pub fn set_minter(&mut self, new_minter: Address) {
         self.assert_authority();
         self.minter.set(new_minter);
@@ -149,8 +130,6 @@ impl SawitToken {
         self.assert_authority();
         self.transfers_paused.set(false);
     }
-
-    // ─── VIEW FUNCTIONS ───
 
     pub fn name(&self) -> String {
         self.name.get_or_default()
@@ -183,8 +162,6 @@ impl SawitToken {
     pub fn is_paused(&self) -> bool {
         self.transfers_paused.get_or_default()
     }
-
-    // ─── INTERNAL ───
 
     fn raw_transfer(&mut self, owner: &Address, recipient: &Address, amount: &U256) {
         let owner_balance = self.balances.get_or_default(owner);

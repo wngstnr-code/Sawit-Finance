@@ -1,20 +1,3 @@
-// Sawit Finance — YieldDistributor Odra Contract
-// ===========================================
-// Distributes CSPR yield to SAWIT token holders proportional to their holdings.
-//
-// Flow:
-//   1. CPO revenue converted to CSPR off-chain (via exchange/OTC)
-//   2. Admin calls set_epoch_distribution() with per-holder claimable amounts
-//      (computed off-chain from SAWIT token balance snapshot)
-//   3. AI Yield Router Agent auto-triggers distribution when CPO price threshold met
-//   4. SAWIT holders call claim_yield() to receive their CSPR
-//   5. After 90-day claim window, unclaimed CSPR rolls to next epoch (sweep)
-//
-// The Yield Router Agent uses x402 micropayments to pay for CPO price API calls
-// (KPBN/MPOB benchmark), then calls trigger_distribution() when conditions are met.
-//
-// Note: For mainnet, upgrade to Merkle-based distribution for gas efficiency.
-// Current approach uses per-address mappings — correct and simple for testnet demo.
 
 use odra::prelude::*;
 use odra::casper_types::U512;
@@ -33,7 +16,7 @@ pub struct DistributionEpoch {
     pub claim_deadline: u64,
     pub is_funded: bool,
     pub is_swept: bool,
-    pub cpo_trigger_price_cents: u64,   // CPO price (cents/ton) that triggered this distribution
+    pub cpo_trigger_price_cents: u64,
 }
 
 #[odra::odra_error]
@@ -78,22 +61,20 @@ pub struct EpochSwept {
     pub timestamp: u64,
 }
 
-const DEFAULT_CLAIM_WINDOW: u64 = 7_776_000_000u64; // 90 days in milliseconds
+const DEFAULT_CLAIM_WINDOW: u64 = 7_776_000_000u64;
 
 #[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept], errors = DistError)]
 pub struct SawitYieldDistributor {
     authority: Var<Address>,
-    yield_router: Var<Address>,          // AI Yield Router Agent address
-    production_vault: Var<Address>,      // KYC source of truth (compliance gate)
+    yield_router: Var<Address>,
+    production_vault: Var<Address>,
     current_epoch: Var<u64>,
     claim_window_ms: Var<u64>,
     total_distributed_all_time: Var<U512>,
     total_claimed_all_time: Var<U512>,
     is_active: Var<bool>,
     epochs: Mapping<u64, DistributionEpoch>,
-    // Per-epoch per-holder claimable amounts: epoch_number → holder → amount
     claimable: Mapping<(u64, Address), U512>,
-    // Claimed flag: epoch_number → holder → claimed
     claimed: Mapping<(u64, Address), bool>,
 }
 
@@ -111,8 +92,6 @@ impl SawitYieldDistributor {
         self.is_active.set(true);
     }
 
-    /// Create a new distribution epoch. Can be called by authority OR the AI Yield Router Agent.
-    /// The router agent calls this autonomously when CPO price crosses the threshold.
     pub fn create_epoch(
         &mut self,
         epoch_label: String,
@@ -161,9 +140,6 @@ impl SawitYieldDistributor {
         });
     }
 
-    /// Set claimable CSPR amount for a specific holder in an epoch.
-    /// Called by authority after computing off-chain from SAWIT balance snapshot.
-    /// For mainnet: replace with Merkle root + proof verification.
     pub fn set_claimable(
         &mut self,
         epoch_number: u64,
@@ -174,7 +150,6 @@ impl SawitYieldDistributor {
         self.claimable.set(&(epoch_number, holder), amount_cspr);
     }
 
-    /// Batch set claimable amounts for multiple holders. More gas-efficient.
     pub fn set_claimable_batch(
         &mut self,
         epoch_number: u64,
@@ -187,7 +162,6 @@ impl SawitYieldDistributor {
         }
     }
 
-    /// Mark epoch as funded. Caller must attach CSPR equal to the epoch's distribution amount.
     #[odra(payable)]
     pub fn fund_epoch(&mut self, epoch_number: u64) {
         self.assert_authority();
@@ -196,7 +170,6 @@ impl SawitYieldDistributor {
         self.epochs.set(&epoch_number, epoch);
     }
 
-    /// SAWIT token holder claims their yield for an epoch.
     pub fn claim_yield(&mut self, epoch_number: u64) {
         if !self.is_active.get_or_default() {
             self.env().revert(DistError::DistributorInactive)
@@ -205,8 +178,6 @@ impl SawitYieldDistributor {
         let holder = self.env().caller();
         let now = self.env().get_block_time();
 
-        // Compliance gate (RWA): only KYC-verified holders may claim yield.
-        // KYC is read cross-contract from ProductionVault — the single source of truth.
         let vault = self.production_vault.get().unwrap();
         if !SawitProductionVaultContractRef::new(self.env(), vault).is_kyc_verified(&holder) {
             self.env().revert(DistError::NotKycVerified)
@@ -241,7 +212,6 @@ impl SawitYieldDistributor {
         epoch.claims_count += 1;
         self.epochs.set(&epoch_number, epoch);
 
-        // Transfer CSPR to holder
         self.env().transfer_tokens(&holder, &claimable_amount);
 
         self.total_claimed_all_time.set(
@@ -256,7 +226,6 @@ impl SawitYieldDistributor {
         });
     }
 
-    /// Sweep unclaimed CSPR after claim window expires. Authority only.
     pub fn sweep_unclaimed(&mut self, epoch_number: u64) {
         self.assert_authority();
 
@@ -277,8 +246,6 @@ impl SawitYieldDistributor {
             + epoch.total_claimed_cspr;
         self.total_distributed_all_time.set(new_total);
 
-        // Unclaimed CSPR stays in contract (rolls to next epoch via next fund_epoch)
-
         self.env().emit_event(EpochSwept {
             epoch_number,
             total_claimed: epoch.total_claimed_cspr,
@@ -291,8 +258,6 @@ impl SawitYieldDistributor {
         self.assert_authority();
         self.yield_router.set(new_router);
     }
-
-    // ─── VIEW FUNCTIONS ───
 
     pub fn get_epoch(&self, epoch_number: u64) -> Option<DistributionEpoch> {
         self.epochs.get(&epoch_number)
@@ -322,8 +287,6 @@ impl SawitYieldDistributor {
         self.production_vault.get().unwrap()
     }
 
-    // ─── INTERNAL ───
-
     fn get_epoch_or_revert(&self, epoch_number: u64) -> DistributionEpoch {
         self.epochs
             .get(&epoch_number)
@@ -345,7 +308,6 @@ mod tests {
         SawitProductionVault, SawitProductionVaultInitArgs, SawitProductionVaultHostRef,
     };
 
-    /// Deploy a YieldDistributor wired to a real ProductionVault (KYC source).
     fn setup(env: &HostEnv) -> (SawitYieldDistributorHostRef, SawitProductionVaultHostRef) {
         let router = env.get_account(1);
         let oracle = env.get_account(5);
@@ -376,9 +338,9 @@ mod tests {
 
         dist.create_epoch(
             "Jun-26".to_string(),
-            U512::from(5_000_000_000u64), // 5,000 CSPR
+            U512::from(5_000_000_000u64),
             100u64,
-            85_000u64, // $850/ton CPO trigger price
+            85_000u64,
         );
 
         assert_eq!(dist.get_current_epoch(), 1);
@@ -393,7 +355,6 @@ mod tests {
         let (mut dist, mut vault) = setup(&env);
         let holder = env.get_account(2);
 
-        // Authority (account 0) registers the holder as KYC-verified
         vault.register_kyc(holder);
 
         dist.create_epoch(
@@ -415,7 +376,7 @@ mod tests {
     fn test_non_kyc_holder_rejected() {
         let env = odra_test::env();
         let (mut dist, _vault) = setup(&env);
-        let holder = env.get_account(2); // NOT registered for KYC
+        let holder = env.get_account(2);
 
         dist.create_epoch(
             "Jun-26".to_string(),
@@ -429,7 +390,6 @@ mod tests {
         env.set_caller(holder);
         let result = dist.try_claim_yield(1u64);
 
-        // Compliance gate blocks the claim
         assert!(result.is_err());
         assert!(!dist.has_claimed(1u64, &holder));
     }

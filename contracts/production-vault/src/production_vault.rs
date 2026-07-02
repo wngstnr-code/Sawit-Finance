@@ -1,42 +1,22 @@
-// Sawit Finance — ProductionVault Odra Contract
-// ==========================================
-// On-chain contract that stores verified CPO (Crude Palm Oil) production data
-// submitted by the AI Oracle Agent. Token holders can verify production data
-// that backs their SAWIT tokens.
-//
-// Architecture:
-//   AI Oracle Agent → record_production() → ProductionVault → SAWIT holders verify
-//
-// Key differences from oil wells:
-//   - Barrels (BBL) → Metric tons of CPO (tons_cpo)
-//   - WTI price → CPO benchmark price (KPBN/MPOB, per ton)
-//   - BOED → Daily CPO output (ton/day)
-//   - Oil Cut % → Oil Extraction Rate (OER %, typically 20-25%)
-//   - Wells → Palm oil mills (PKS)
-//   - Fields → Estates (kebun kelapa sawit)
-//
-// Oracle: AI Oracle Agent (Python) — scrapes GAPKI/KPBN/MPOB data,
-//         verifies against multiple sources, posts on-chain via CSPR.cloud.
-//         x402 micropayments used for each off-chain API call.
 
 use odra::prelude::*;
 
 #[odra::odra_type]
 pub struct EpochRecord {
     pub epoch_number: u64,
-    pub epoch_label: String,        // e.g., "Jun-26"
-    pub tons_cpo: u64,              // Metric tons of CPO produced
-    pub revenue_usd: u64,           // Revenue in USD (cents)
-    pub daily_output_ton: u32,      // Average daily CPO output (ton/day)
-    pub oer_pct: u8,                // Oil Extraction Rate % (typically 20-25)
-    pub cpo_price_cents: u64,       // CPO benchmark price per ton (USD cents)
-    pub estate_count: u8,           // Number of active palm oil estates
-    pub active_mills: u8,           // Number of active PKS mills
-    pub validation_score: u8,       // Oracle confidence score (0-100)
-    pub data_source: String,        // e.g., "GAPKI+KPBN+MPOB"
-    pub epoch_timestamp: u64,       // End-of-month timestamp (ms)
-    pub recorded_at: u64,           // Block time when recorded
-    pub oracle_agent: Address,      // Which AI agent submitted this
+    pub epoch_label: String,
+    pub tons_cpo: u64,
+    pub revenue_usd: u64,
+    pub daily_output_ton: u32,
+    pub oer_pct: u8,
+    pub cpo_price_cents: u64,
+    pub estate_count: u8,
+    pub active_mills: u8,
+    pub validation_score: u8,
+    pub data_source: String,
+    pub epoch_timestamp: u64,
+    pub recorded_at: u64,
+    pub oracle_agent: Address,
 }
 
 #[odra::odra_error]
@@ -81,7 +61,7 @@ pub struct OracleReputationUpdated {
 #[odra::module(events = [ProductionRecorded, OracleAgentUpdated, OracleReputationUpdated], errors = VaultError)]
 pub struct SawitProductionVault {
     authority: Var<Address>,
-    oracle_agent: Var<Address>,         // Whitelisted AI Oracle Agent address
+    oracle_agent: Var<Address>,
     epoch_count: Var<u64>,
     last_epoch_timestamp: Var<u64>,
     total_tons_cpo_all_time: Var<u64>,
@@ -89,9 +69,8 @@ pub struct SawitProductionVault {
     is_active: Var<bool>,
     epochs: Mapping<u64, EpochRecord>,
     kyc_whitelist: Mapping<Address, bool>,
-    // Oracle reputation: rolling average of validation scores across all submissions
-    oracle_total_score: Var<u64>,       // Accumulated sum of all validation scores
-    oracle_submission_count: Var<u64>,  // Total successful submissions by oracle
+    oracle_total_score: Var<u64>,
+    oracle_submission_count: Var<u64>,
 }
 
 #[odra::module]
@@ -109,8 +88,6 @@ impl SawitProductionVault {
         self.oracle_submission_count.set(0u64);
     }
 
-    /// Record a new CPO production epoch. Only the whitelisted AI Oracle Agent can call this.
-    /// The agent scrapes GAPKI/KPBN/MPOB data and calls this after cross-source verification.
     pub fn record_production(
         &mut self,
         epoch_label: String,
@@ -174,7 +151,6 @@ impl SawitProductionVault {
         self.total_revenue_all_time
             .set(self.total_revenue_all_time.get_or_default() + revenue_usd);
 
-        // Update oracle reputation: rolling average of validation scores
         let new_total_score = self.oracle_total_score.get_or_default() + validation_score as u64;
         let new_submission_count = self.oracle_submission_count.get_or_default() + 1;
         self.oracle_total_score.set(new_total_score);
@@ -200,7 +176,6 @@ impl SawitProductionVault {
         });
     }
 
-    /// Update the AI Oracle Agent address. Only authority can call.
     pub fn update_oracle_agent(&mut self, new_agent: Address) {
         self.assert_authority();
         let old_agent = self.oracle_agent.get().unwrap();
@@ -212,13 +187,11 @@ impl SawitProductionVault {
         });
     }
 
-    /// Register an investor as KYC-verified. Only authority can call.
     pub fn register_kyc(&mut self, investor: Address) {
         self.assert_authority();
         self.kyc_whitelist.set(&investor, true);
     }
 
-    /// Revoke KYC for an investor. Only authority can call.
     pub fn revoke_kyc(&mut self, investor: Address) {
         self.assert_authority();
         self.kyc_whitelist.set(&investor, false);
@@ -228,8 +201,6 @@ impl SawitProductionVault {
         self.assert_authority();
         self.is_active.set(active);
     }
-
-    // ─── VIEW FUNCTIONS ───
 
     pub fn get_epoch(&self, epoch_number: u64) -> Option<EpochRecord> {
         self.epochs.get(&epoch_number)
@@ -259,9 +230,6 @@ impl SawitProductionVault {
         self.authority.get().unwrap()
     }
 
-    /// Returns the oracle's on-chain reputation score (0-100).
-    /// Computed as rolling average of validation scores across all successful submissions.
-    /// A score ≥80 indicates a highly reliable oracle agent.
     pub fn get_oracle_reputation(&self) -> u8 {
         let count = self.oracle_submission_count.get_or_default();
         if count == 0 {
@@ -273,8 +241,6 @@ impl SawitProductionVault {
     pub fn get_oracle_submission_count(&self) -> u64 {
         self.oracle_submission_count.get_or_default()
     }
-
-    // ─── INTERNAL ───
 
     fn assert_authority(&self) {
         if self.env().caller() != self.authority.get().unwrap() {
@@ -312,16 +278,16 @@ mod tests {
         env.set_caller(oracle);
         vault.record_production(
             "Jun-26".to_string(),
-            45_000,               // 45,000 tons CPO
-            36_000_000,           // $360,000 revenue (cents)
-            1_500,                // 1,500 ton/day
-            22,                   // 22% OER
-            80_000,               // $800/ton CPO price (cents)
-            12,                   // 12 estates
-            8,                    // 8 active mills
-            85,                   // 85% validation score
+            45_000,
+            36_000_000,
+            1_500,
+            22,
+            80_000,
+            12,
+            8,
+            85,
             "GAPKI+KPBN".to_string(),
-            1_751_000_000_000u64, // timestamp ms
+            1_751_000_000_000u64,
         );
 
         assert_eq!(vault.get_epoch_count(), 1);
@@ -343,7 +309,6 @@ mod tests {
         assert_eq!(vault.get_oracle_submission_count(), 0);
 
         env.set_caller(oracle);
-        // First submission: score 80
         vault.record_production(
             "May-26".to_string(), 40_000, 32_000_000, 1_300, 22, 80_000,
             10, 7, 80, "GAPKI+KPBN".to_string(), 1_748_000_000_000u64,
@@ -351,7 +316,6 @@ mod tests {
         assert_eq!(vault.get_oracle_reputation(), 80);
         assert_eq!(vault.get_oracle_submission_count(), 1);
 
-        // Second submission: score 90 → avg = (80+90)/2 = 85
         vault.record_production(
             "Jun-26".to_string(), 45_000, 36_000_000, 1_500, 22, 80_000,
             12, 8, 90, "GAPKI+KPBN+MPOB".to_string(), 1_751_000_000_000u64,
