@@ -34,3 +34,12 @@ export const LOOP_STEPS = [
     tx: '23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6',
   },
 ] as const;
+
+export const X402_PROOF = {
+  n: 5,
+  title: 'Agent pays via x402',
+  desc: 'The oracle pays for gated CPO data over the official Casper x402 protocol — 402 challenge, signed EIP-712 authorization, settled on-chain as a CEP-18 transfer_with_authorization in SAWITX. Gasless for the agent; the facilitator pays gas.',
+  entrypoint: 'transfer_with_authorization',
+  tx: '1ea0a5f2c4a03a282055ecb9e826108bb4ad3d04e8e5530d9baf856f27e490f3',
+  url: `${NETWORK.explorer}/deploy/1ea0a5f2c4a03a282055ecb9e826108bb4ad3d04e8e5530d9baf856f27e490f3`,
+} as const;

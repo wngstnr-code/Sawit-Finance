@@ -1,6 +1,6 @@
 import { Section, Eyebrow } from '@/components/ui/primitives';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/Reveal';
-import { LOOP_STEPS, txUrl } from '@/lib/onchain';
+import { LOOP_STEPS, X402_PROOF, txUrl } from '@/lib/onchain';
 
 export default function OnChainProof() {
   return (
@@ -14,7 +14,8 @@ export default function OnChainProof() {
           <p className="mt-5 font-serif text-lg leading-relaxed text-muted sm:text-xl">
             Every step below is a real transaction on Casper Testnet — record →
             mint → fund → claim, including cross-contract CPI and a KYC-gated
-            payout. Verify each on the explorer.
+            payout — plus an agent paying for its own data over the official
+            x402 protocol. Verify each on the explorer.
           </p>
         </Reveal>
       </div>
@@ -43,6 +44,27 @@ export default function OnChainProof() {
             </a>
           </StaggerItem>
         ))}
+        <StaggerItem className="bg-card p-7 md:col-span-2">
+          <div className="flex items-center gap-3">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-ink font-mono text-[13px] font-semibold text-bg">
+              {X402_PROOF.n}
+            </span>
+            <h3 className="font-display text-lg font-semibold text-ink">
+              {X402_PROOF.title}
+            </h3>
+          </div>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
+            {X402_PROOF.desc}
+          </p>
+          <a
+            href={X402_PROOF.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-1.5 font-mono text-[12px] text-brand transition-colors hover:text-ink"
+          >
+            {X402_PROOF.entrypoint} · {X402_PROOF.tx.slice(0, 10)}… ↗
+          </a>
+        </StaggerItem>
       </Stagger>
     </Section>
   );
