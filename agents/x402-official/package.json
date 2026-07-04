@@ -1,0 +1,24 @@
+{
+  "name": "sawit-x402-official",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "facilitator": "tsx facilitator.ts",
+    "server": "tsx server.ts",
+    "agent": "tsx agent.ts"
+  },
+  "dependencies": {
+    "@make-software/casper-x402": "1.0.0",
+    "@x402/core": "2.14.0",
+    "@x402/express": "2.14.0",
+    "@x402/fetch": "2.14.0",
+    "casper-js-sdk": "5.0.12",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

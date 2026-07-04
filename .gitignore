@@ -8,6 +8,7 @@ Thumbs.db
 .env.*
 **/.env
 **/.env.*
+!**/.env.example
 
 *.pem
 *.key
@@ -17,6 +18,7 @@ secret_key*
 
 *.tmp
 *.log
+*.notes.md
 
 .venv/
 __pycache__/
