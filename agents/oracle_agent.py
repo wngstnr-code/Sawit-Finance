@@ -43,6 +43,11 @@ X402_FACILITATOR_URL = os.getenv("X402_FACILITATOR_URL", "http://127.0.0.1:8402"
 X402_NETWORK = os.getenv("X402_NETWORK", "casper-test")
 X402_MAX_MOTES = int(os.getenv("X402_MAX_PRICE_MOTES", "100000000"))
 
+X402_OFFICIAL = os.getenv("X402_OFFICIAL", "on").lower() == "on"
+X402_OFFICIAL_URL = os.getenv("X402_OFFICIAL_URL", "http://127.0.0.1:4021")
+X402_OFFICIAL_DIR = REPO_ROOT / "agents" / "x402-official"
+X402_OFFICIAL_TIMEOUT_S = int(os.getenv("X402_OFFICIAL_TIMEOUT_S", "180"))
+
 _x402_payer = None
 if X402_LIVE and X402_AVAILABLE:
     seed = ORACLE_AGENT_SECRET_KEY if len(ORACLE_AGENT_SECRET_KEY) >= 64 else None
@@ -136,17 +141,62 @@ async def fetch_mpob_data(
         confidence=80,
     )
 
+async def fetch_via_x402_official(
+    session: aiohttp.ClientSession,
+    resource_path: str,
+) -> Optional[dict]:
+    """Pay for a gated resource over the official x402 protocol (EIP-712 → CEP-18 transfer_with_authorization) via the paid-fetch bridge; returns JSON or None."""
+    if not (X402_OFFICIAL and (X402_OFFICIAL_DIR / "paid-fetch.ts").exists()):
+        return None
+
+    try:
+        async with session.get(
+            f"{X402_OFFICIAL_URL}/health", timeout=aiohttp.ClientTimeout(total=2)
+        ) as r:
+            if r.status != 200:
+                return None
+    except Exception:
+        return None
+
+    url = f"{X402_OFFICIAL_URL}{resource_path}"
+    log.info(f"[x402-official] Paying for {resource_path} (EIP-712 → SAWITX)...")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "npx", "tsx", "paid-fetch.ts", url,
+            cwd=str(X402_OFFICIAL_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=X402_OFFICIAL_TIMEOUT_S)
+        result = json.loads(out.decode().strip().splitlines()[-1])
+    except Exception as e:
+        log.warning(f"[x402-official] Bridge failed ({e}) — trying reference client")
+        return None
+
+    if not result.get("ok"):
+        log.warning(f"[x402-official] Payment failed: {result.get('error')} — trying reference client")
+        return None
+
+    settlement = result.get("settlement") or {}
+    if settlement.get("transaction"):
+        log.info(f"[x402-official] ✅ Settled on-chain: {settlement['transaction']}")
+    return result["data"]
+
 async def fetch_via_x402(
     session: aiohttp.ClientSession,
     resource_path: str,
 ) -> Optional[dict]:
-    """Fetch a gated CPO resource via the real x402 handshake; returns JSON or None (caller falls back to a simulated reading)."""
+    """Fetch a gated CPO resource: official x402 protocol first, then the from-scratch reference client; returns JSON or None (caller falls back to a representative reading)."""
+    data = await fetch_via_x402_official(session, resource_path)
+    if data is not None:
+        return data
+
     if not (X402_LIVE and X402_AVAILABLE and _x402_payer is not None):
         return None
 
     url = f"{X402_FACILITATOR_URL}{resource_path}"
     try:
-        log.info(f"[x402] Paying for {resource_path} ...")
+        log.info(f"[x402] Paying for {resource_path} (reference client)...")
         data = await fetch_with_x402(session, url, _x402_payer, X402_MAX_MOTES)
         log.info(f"[x402] ✅ Paid + received {resource_path}")
         return data
