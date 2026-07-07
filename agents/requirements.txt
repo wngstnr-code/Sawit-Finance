@@ -4,5 +4,5 @@ pycspr==1.1.0
 google-generativeai==0.8.3
 # Pinned to <43 by pycspr 1.1.0 (Casper SDK); newer patched cryptography is not installable.
 # The bundled-OpenSSL advisory is tracked as an accepted/dismissed Dependabot alert.
-cryptography==42.0.8
+cryptography==49.0.0
 mcp[cli]>=1.28.0
