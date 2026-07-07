@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Casper Developers (Telegram)
+    url: https://t.me/CSPRDevelopers
+    about: Ask questions and get help from the Casper developer community.
+  - name: Casper Network (Discord)
+    url: https://discord.com/invite/caspernetwork
+    about: Chat with the broader Casper Network community.
+  - name: Live app — sawitfinance.xyz
+    url: https://sawitfinance.xyz
+    about: Try the live Sawit Finance dApp on Casper Testnet.

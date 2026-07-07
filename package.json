@@ -2,6 +2,7 @@
   "name": "sawit-fi",
   "version": "0.1.0",
   "description": "Sawit Finance — Tokenized Indonesian Palm Oil (CPO) RWA on Casper Network",
+  "license": "MIT",
   "scripts": {
     "build": "cargo build --release",
     "test": "cargo test",
