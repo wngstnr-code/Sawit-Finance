@@ -265,4 +265,11 @@ Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[s
 
 ---
 
+## License
+
+Released under the [MIT License](LICENSE). Contributions are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+---
+
 *Casper Agentic Buildathon 2026 — RWA · DeFi · Agentic AI*
