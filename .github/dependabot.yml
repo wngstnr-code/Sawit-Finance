@@ -19,6 +19,12 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    ignore:
+      # Major bumps break the CSPR.click UI stack (reakit targets React 16/17
+      # internals). Next 15/16 + React 19 crashed the live app; see rollback in
+      # git history. Stay on patched 14.x until CSPR.click supports newer React.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Python AI agents
   - package-ecosystem: "pip"
@@ -29,6 +35,10 @@ updates:
     labels:
       - "dependencies"
       - "agents"
+    ignore:
+      # pycspr (Casper SDK) pins cryptography <43; newer majors are uninstallable.
+      - dependency-name: "cryptography"
+        versions: [">=43.0.0"]
 
   # GitHub Actions workflows
   - package-ecosystem: "github-actions"
