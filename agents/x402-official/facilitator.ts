@@ -10,6 +10,7 @@ import { ExactCasperScheme } from "@make-software/casper-x402/exact/facilitator"
 import { toFacilitatorCasperSigner } from "@make-software/casper-x402";
 import casperSdk from "casper-js-sdk";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { readFileSync } from "node:fs";
 
 import { env } from "./env.js";
@@ -27,6 +28,15 @@ const facilitator = new x402Facilitator().register(
 
 const app = express();
 app.use(express.json());
+// Settlement submits on-chain deploys; cap request rate so a client can't spam the signer.
+app.use(
+  rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+);
 
 app.post("/verify", async (req, res) => {
   try {

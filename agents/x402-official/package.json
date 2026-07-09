@@ -14,7 +14,8 @@
     "@x402/fetch": "2.14.0",
     "casper-js-sdk": "5.0.12",
     "dotenv": "^16.4.7",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.5.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
