@@ -47,6 +47,14 @@ path = "src/set_gorr.rs"
 name = "set_claimable"
 path = "src/set_claimable.rs"
 
+[[bin]]
+name = "allocate"
+path = "src/allocate.rs"
+
+[[bin]]
+name = "kyc"
+path = "src/kyc.rs"
+
 [features]
 livenet = ["dep:odra-casper-livenet-env"]
 
@@ -57,3 +65,19 @@ sawit-token = { path = "../contracts/sawit-token" }
 token-minter = { path = "../contracts/token-minter" }
 yield-distributor = { path = "../contracts/yield-distributor" }
 odra-casper-livenet-env = { version = "2.8.2", optional = true }
+
+[[bin]]
+name = "sweep"
+path = "src/sweep.rs"
+
+[[bin]]
+name = "topup"
+path = "src/topup.rs"
+
+[[bin]]
+name = "upgrade_dist"
+path = "src/upgrade_dist.rs"
+
+[[bin]]
+name = "inspect_epoch"
+path = "src/inspect_epoch.rs"

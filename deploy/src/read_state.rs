@@ -47,6 +47,58 @@ fn main() {
         None => (false, 0u64),
     };
 
+    // Iterate over DISTRIBUTION epochs (not vault epochs): a distribution
+    // epoch can exist without a matching production record (e.g. a re-fund
+    // epoch), and it must still show up in provenance. Vault data is merged
+    // in when a record exists.
+    let mut epoch_entries: Vec<String> = Vec::new();
+    let newest = cur_epoch.max(epoch_count);
+    let oldest = newest.saturating_sub(5).max(1);
+    let mut n = newest;
+    while n >= oldest && n >= 1 {
+        let vault_rec = vault.get_epoch(n);
+        let dist_rec = dist.get_epoch(n);
+        if vault_rec.is_some() || dist_rec.is_some() {
+            let (tons_cpo, revenue_usd, epoch_timestamp) = match &vault_rec {
+                Some(r) => (r.tons_cpo, r.revenue_usd, r.epoch_timestamp),
+                None => (0u64, 0u64, 0u64),
+            };
+            let tokens_minted = match minter.get_epoch_mint(n) {
+                Some(m) => format!("\"{}\"", m.tokens_minted),
+                None => "null".to_string(),
+            };
+            let (e_funded, total_distribution_cspr, total_claimed_cspr, claim_deadline_ms) =
+                match dist_rec {
+                    Some(e) => (
+                        e.is_funded,
+                        e.total_distribution_cspr.to_string(),
+                        e.total_claimed_cspr.to_string(),
+                        e.claim_deadline,
+                    ),
+                    None => (false, "0".to_string(), "0".to_string(), 0u64),
+                };
+            epoch_entries.push(format!(
+                "{{\"epoch_number\":{},\"tons_cpo\":{},\"revenue_usd\":{},\
+\"epoch_timestamp\":{},\"tokens_minted\":{},\"funded\":{},\
+\"total_distribution_cspr\":\"{}\",\"total_claimed_cspr\":\"{}\",\"claim_deadline_ms\":{}}}",
+                n,
+                tons_cpo,
+                revenue_usd,
+                epoch_timestamp,
+                tokens_minted,
+                e_funded,
+                total_distribution_cspr,
+                total_claimed_cspr,
+                claim_deadline_ms
+            ));
+        }
+        if n == 1 {
+            break;
+        }
+        n -= 1;
+    }
+    let epochs_json = format!("[{}]", epoch_entries.join(","));
+
     let json = format!(
         "{{\"epoch_count\":{epoch_count},\"oracle_reputation\":{oracle_reputation},\
 \"oracle_submission_count\":{oracle_submission_count},\"total_tons_cpo\":{total_tons_cpo},\
@@ -55,7 +107,7 @@ fn main() {
 \"current_distribution_epoch\":{cur_epoch},\"latest_epoch_funded\":{funded},\
 \"latest_epoch_claim_deadline_ms\":{deadline},\"total_distributed_cspr\":\"{total_distributed}\",\
 \"total_tokens_minted\":\"{total_minted}\",\"gorr_bps\":{gorr_bps},\"token_rate\":{token_rate},\
-\"total_sawit_supply\":\"{total_supply}\"}}"
+\"total_sawit_supply\":\"{total_supply}\",\"epochs\":{epochs_json}}}"
     );
     println!("SAWIT_STATE_JSON {json}");
 }

@@ -20,10 +20,16 @@ fn main() {
         "account-hash-e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe";
 
     let holder_str = std::env::var("CLAIM_HOLDER").unwrap_or_else(|_| HOLDER_ACCOUNT.into());
-    let amount_motes: u64 = std::env::var("CLAIM_AMOUNT_MOTES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(25_000_000_000u64);
+    // No default: a silent fallback amount is how testnet epoch 1 ended up
+    // over-allocated (claimed 125 CSPR > 100 CSPR pool). The amount must be
+    // an explicit operator decision.
+    let amount_motes: u64 = match std::env::var("CLAIM_AMOUNT_MOTES").ok().and_then(|v| v.parse().ok()) {
+        Some(v) => v,
+        None => {
+            eprintln!("CLAIM_AMOUNT_MOTES is required (motes, e.g. 25000000000 = 25 CSPR)");
+            std::process::exit(2);
+        }
+    };
 
     let env = odra_casper_livenet_env::env();
     let holder = Address::from_str(&holder_str).expect("valid account hash");

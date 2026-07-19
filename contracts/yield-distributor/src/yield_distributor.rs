@@ -33,6 +33,7 @@ pub enum DistError {
     NothingToClaim = 10,
     Overflow = 11,
     NotKycVerified = 12,
+    ClaimableExceedsPool = 13,
 }
 
 #[odra::event]
@@ -76,6 +77,11 @@ pub struct SawitYieldDistributor {
     epochs: Mapping<u64, DistributionEpoch>,
     claimable: Mapping<(u64, Address), U512>,
     claimed: Mapping<(u64, Address), bool>,
+    // Sum of claimable amounts currently set per epoch, so allocations can be
+    // capped at the epoch's funded pool. Note: entries set before the cap was
+    // introduced (pre-upgrade) are not reflected here — the cap protects every
+    // allocation made from the upgrade onwards.
+    claimable_total: Mapping<u64, U512>,
 }
 
 #[odra::module]
@@ -147,7 +153,17 @@ impl SawitYieldDistributor {
         amount_cspr: U512,
     ) {
         self.assert_authority();
+        let epoch = self.get_epoch_or_revert(epoch_number);
+        let old = self.claimable.get_or_default(&(epoch_number, holder));
+        let prev_total = self.claimable_total.get_or_default(&epoch_number);
+        // Saturating: pre-cap entries may exist that this counter never saw.
+        let new_total =
+            if prev_total > old { prev_total - old } else { U512::zero() } + amount_cspr;
+        if new_total > epoch.total_distribution_cspr {
+            self.env().revert(DistError::ClaimableExceedsPool)
+        }
         self.claimable.set(&(epoch_number, holder), amount_cspr);
+        self.claimable_total.set(&epoch_number, new_total);
     }
 
     pub fn set_claimable_batch(
@@ -157,9 +173,18 @@ impl SawitYieldDistributor {
         amounts: Vec<U512>,
     ) {
         self.assert_authority();
+        let epoch = self.get_epoch_or_revert(epoch_number);
+        let mut new_total = self.claimable_total.get_or_default(&epoch_number);
         for (holder, amount) in holders.into_iter().zip(amounts.into_iter()) {
+            let old = self.claimable.get_or_default(&(epoch_number, holder));
+            // Saturating: pre-cap entries may exist that this counter never saw.
+            new_total = if new_total > old { new_total - old } else { U512::zero() } + amount;
+            if new_total > epoch.total_distribution_cspr {
+                self.env().revert(DistError::ClaimableExceedsPool)
+            }
             self.claimable.set(&(epoch_number, holder), amount);
         }
+        self.claimable_total.set(&epoch_number, new_total);
     }
 
     #[odra(payable)]
@@ -238,7 +263,13 @@ impl SawitYieldDistributor {
             self.env().revert(DistError::ClaimWindowNotExpired)
         }
 
-        let unclaimed = epoch.total_distribution_cspr - epoch.total_claimed_cspr;
+        // Saturating: epoch 1 on testnet was over-allocated before the
+        // set_claimable cap existed (claimed 125 > pool 100); a plain
+        // subtraction would panic and make the epoch unsweepable forever.
+        let unclaimed = epoch
+            .total_distribution_cspr
+            .checked_sub(epoch.total_claimed_cspr)
+            .unwrap_or_default();
         epoch.is_swept = true;
         self.epochs.set(&epoch_number, epoch.clone());
 
@@ -265,6 +296,10 @@ impl SawitYieldDistributor {
 
     pub fn get_claimable(&self, epoch_number: u64, holder: &Address) -> U512 {
         self.claimable.get_or_default(&(epoch_number, *holder))
+    }
+
+    pub fn get_claimable_total(&self, epoch_number: u64) -> U512 {
+        self.claimable_total.get_or_default(&epoch_number)
     }
 
     pub fn has_claimed(&self, epoch_number: u64, holder: &Address) -> bool {
@@ -370,6 +405,81 @@ mod tests {
         dist.claim_yield(1u64);
 
         assert!(dist.has_claimed(1u64, &holder));
+    }
+
+    #[test]
+    fn test_set_claimable_capped_at_pool() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let a = env.get_account(2);
+        let b = env.get_account(3);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            2u64,
+            85_000u64,
+        );
+
+        // Allocations within the pool are fine, including overwriting a holder.
+        dist.set_claimable(1u64, a, U512::from(3_000_000_000u64));
+        dist.set_claimable(1u64, a, U512::from(4_000_000_000u64));
+        assert_eq!(dist.get_claimable_total(1u64), U512::from(4_000_000_000u64));
+
+        // Pushing the epoch's summed allocations past the pool must revert.
+        let over = dist.try_set_claimable(1u64, b, U512::from(2_000_000_000u64));
+        assert!(over.is_err());
+        assert_eq!(dist.get_claimable(1u64, &b), U512::zero());
+
+        // Exactly filling the pool is allowed.
+        dist.set_claimable(1u64, b, U512::from(1_000_000_000u64));
+        assert_eq!(dist.get_claimable_total(1u64), U512::from(5_000_000_000u64));
+
+        // Batch over-allocation must also revert.
+        let batch = dist.try_set_claimable_batch(
+            1u64,
+            vec![a, b],
+            vec![U512::from(4_000_000_000u64), U512::from(2_000_000_000u64)],
+        );
+        assert!(batch.is_err());
+    }
+
+    #[test]
+    fn test_set_claimable_unknown_epoch_rejected() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let holder = env.get_account(2);
+        let r = dist.try_set_claimable(9u64, holder, U512::from(1u64));
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_sweep_after_deadline() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+
+        env.set_caller(holder);
+        dist.claim_yield(1u64);
+        env.set_caller(env.get_account(0));
+
+        // Before the deadline sweep must refuse; after it, sweep succeeds and
+        // total_distributed counts the claimed amount.
+        assert!(dist.try_sweep_unclaimed(1u64).is_err());
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+        dist.sweep_unclaimed(1u64);
+        assert!(dist.get_epoch(1).unwrap().is_swept);
+        assert_eq!(dist.get_total_distributed(), U512::from(1_000_000_000u64));
     }
 
     #[test]
