@@ -27,6 +27,10 @@ pub enum VaultError {
     DuplicateEpoch = 4,
     VaultInactive = 5,
     InvalidEpochData = 6,
+    // New variants must always be appended at the end — the contract is
+    // upgradable in-place and existing error codes must never shift, or
+    // already-integrated tooling/tests would misinterpret reverts.
+    TonsExceedsLimit = 7,
 }
 
 #[odra::event]
@@ -48,7 +52,20 @@ pub struct OracleAgentUpdated {
     pub timestamp: u64,
 }
 
+#[odra::event]
+pub struct MaxTonsPerEpochUpdated {
+    pub old_max_tons: u64,
+    pub new_max_tons: u64,
+    pub timestamp: u64,
+}
+
 const MIN_VALIDATION_SCORE: u8 = 60;
+
+// Conservative ceiling on tons_cpo accepted in a single record_production
+// call, guarding against an oracle key typo/compromise minting a 10x+
+// dilution event. Applies whenever max_tons_per_epoch has not been
+// explicitly configured (Var unset reads as 0 via get_or_default).
+const DEFAULT_MAX_TONS_PER_EPOCH: u64 = 100_000;
 
 #[odra::event]
 pub struct OracleReputationUpdated {
@@ -70,7 +87,7 @@ pub struct KycRevoked {
     pub timestamp: u64,
 }
 
-#[odra::module(events = [ProductionRecorded, OracleAgentUpdated, OracleReputationUpdated, KycRegistered, KycRevoked], errors = VaultError)]
+#[odra::module(events = [ProductionRecorded, OracleAgentUpdated, OracleReputationUpdated, KycRegistered, KycRevoked, MaxTonsPerEpochUpdated], errors = VaultError)]
 pub struct SawitProductionVault {
     authority: Var<Address>,
     oracle_agent: Var<Address>,
@@ -83,6 +100,11 @@ pub struct SawitProductionVault {
     kyc_whitelist: Mapping<Address, bool>,
     oracle_total_score: Var<u64>,
     oracle_submission_count: Var<u64>,
+    // Appended field: unset (reads as 0 via get_or_default) on epochs/vaults
+    // deployed before this upgrade — max_tons_per_epoch() falls back to
+    // DEFAULT_MAX_TONS_PER_EPOCH in that case, so the guard is active
+    // immediately after upgrade without requiring an operator call.
+    max_tons_per_epoch: Var<u64>,
 }
 
 #[odra::module]
@@ -98,6 +120,7 @@ impl SawitProductionVault {
         self.is_active.set(true);
         self.oracle_total_score.set(0u64);
         self.oracle_submission_count.set(0u64);
+        self.max_tons_per_epoch.set(DEFAULT_MAX_TONS_PER_EPOCH);
     }
 
     pub fn record_production(
@@ -133,6 +156,10 @@ impl SawitProductionVault {
 
         if tons_cpo == 0 {
             self.env().revert(VaultError::InvalidEpochData)
+        }
+
+        if tons_cpo > self.max_tons_per_epoch_or_default() {
+            self.env().revert(VaultError::TonsExceedsLimit)
         }
 
         let epoch_number = self.epoch_count.get_or_default() + 1;
@@ -222,6 +249,20 @@ impl SawitProductionVault {
         self.is_active.set(active);
     }
 
+    pub fn set_max_tons_per_epoch(&mut self, max_tons: u64) {
+        self.assert_authority();
+        if max_tons == 0 {
+            self.env().revert(VaultError::InvalidEpochData)
+        }
+        let old_max_tons = self.max_tons_per_epoch_or_default();
+        self.max_tons_per_epoch.set(max_tons);
+        self.env().emit_event(MaxTonsPerEpochUpdated {
+            old_max_tons,
+            new_max_tons: max_tons,
+            timestamp: self.env().get_block_time(),
+        });
+    }
+
     pub fn get_epoch(&self, epoch_number: u64) -> Option<EpochRecord> {
         self.epochs.get(&epoch_number)
     }
@@ -260,6 +301,19 @@ impl SawitProductionVault {
 
     pub fn get_oracle_submission_count(&self) -> u64 {
         self.oracle_submission_count.get_or_default()
+    }
+
+    pub fn get_max_tons_per_epoch(&self) -> u64 {
+        self.max_tons_per_epoch_or_default()
+    }
+
+    fn max_tons_per_epoch_or_default(&self) -> u64 {
+        let stored = self.max_tons_per_epoch.get_or_default();
+        if stored == 0 {
+            DEFAULT_MAX_TONS_PER_EPOCH
+        } else {
+            stored
+        }
     }
 
     fn assert_authority(&self) {
@@ -399,5 +453,100 @@ mod tests {
             "GAPKI".to_string(), 1_751_000_000_000u64,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_record_production_within_max_tons_ok() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let oracle = env.get_account(1);
+
+        assert_eq!(vault.get_max_tons_per_epoch(), 100_000);
+
+        env.set_caller(oracle);
+        vault.record_production(
+            "Jun-26".to_string(),
+            100_000,
+            36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert_eq!(vault.get_epoch_count(), 1);
+        assert_eq!(vault.get_total_tons_cpo(), 100_000);
+    }
+
+    #[test]
+    fn test_record_production_over_max_tons_rejected() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let oracle = env.get_account(1);
+
+        env.set_caller(oracle);
+        let result = vault.try_record_production(
+            "Jun-26".to_string(),
+            100_001,
+            36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert!(result.is_err());
+        assert_eq!(vault.get_epoch_count(), 0);
+    }
+
+    #[test]
+    fn test_set_max_tons_per_epoch_non_authority_rejected() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let attacker = env.get_account(2);
+
+        env.set_caller(attacker);
+        let result = vault.try_set_max_tons_per_epoch(50_000);
+        assert!(result.is_err());
+        assert_eq!(vault.get_max_tons_per_epoch(), 100_000);
+    }
+
+    #[test]
+    fn test_set_max_tons_per_epoch_authority_updates_bound() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let oracle = env.get_account(1);
+
+        vault.set_max_tons_per_epoch(50_000);
+        assert_eq!(vault.get_max_tons_per_epoch(), 50_000);
+
+        env.set_caller(oracle);
+        let rejected = vault.try_record_production(
+            "Jun-26".to_string(),
+            50_001,
+            36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert!(rejected.is_err());
+    }
+
+    #[test]
+    fn test_set_max_tons_per_epoch_rejects_zero() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+
+        let result = vault.try_set_max_tons_per_epoch(0);
+        assert!(result.is_err());
+        assert_eq!(vault.get_max_tons_per_epoch(), 100_000);
+    }
+
+    #[test]
+    fn test_set_active_false_blocks_record_production() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let oracle = env.get_account(1);
+
+        vault.set_active(false);
+
+        env.set_caller(oracle);
+        let result = vault.try_record_production(
+            "Jun-26".to_string(),
+            45_000, 36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert!(result.is_err());
+        assert_eq!(vault.get_epoch_count(), 0);
     }
 }

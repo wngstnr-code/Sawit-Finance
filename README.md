@@ -100,7 +100,7 @@ Deployer account hash: `57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd0
 
 ## The Agentic Layer
 
-Three AI agents run the protocol autonomously — this is the heart of the Buildathon entry.
+Three autonomous agents run the protocol — two with a real LLM at the decision point, one deliberately rule-based — and this is the heart of the Buildathon entry.
 
 | Agent | Role | AI |
 |-------|------|----|
@@ -160,7 +160,7 @@ Tokenizing regulated palm-oil revenue legally requires a licensed operator + KYC
 - **Multi-source validation** — data rejected if the 3 sources diverge > 10% or the score drops below 60/100.
 - **AI safety rails** — autonomous GORR changes capped to ±100 bps/cycle, locked to [1%, 10%].
 
-The one documented trade-off: per-holder shares are computed off-chain (CEP-18 has no on-chain holder enumeration), then posted — amounts and claims stay fully visible on-chain. **Roadmap:** Merkle-proof claims remove even this, multi-sig operator, DAO-governed GORR bounds.
+Two documented trade-offs: **(1)** per-holder shares are computed off-chain (CEP-18 has no on-chain holder enumeration), then posted — amounts and claims stay fully visible on-chain; **(2)** a single operator authority key currently controls all four upgradable packages — the same key that performed the live in-place upgrades below. That's a deliberate v1 simplification for a testnet protocol run by one operator, and it's stated here rather than left for you to discover. **Roadmap:** Merkle-proof claims retire the first; a multi-sig operator + timelock (Phase 3) retires the second, alongside DAO-governed GORR bounds.
 
 ---
 
@@ -195,7 +195,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 
 ```bash
 # 1. Contracts — run all tests incl. the full e2e pipeline (no node needed)
-cargo +nightly-2026-01-01 test            # 31 tests, incl. record→mint→KYC→claim
+cargo +nightly-2026-01-01 test            # 42 tests, incl. record→mint→KYC→claim
 
 # 2. Agents
 python3 -m venv .venv && ./.venv/bin/pip install -r agents/requirements.txt
@@ -282,6 +282,8 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 > Sequencing rationale: CSPR yield ships in v1 because the native-CSPR loop works today with zero external dependencies; csprUSD is a clean, well-scoped swap once mainnet-live. Real mill data is a partnership problem, not an architecture problem — the verification pipeline, CPI-locked minting, and oracle reputation scoring don't change.
 
+**Who's building this:** Sawit Finance is designed, built, and operated solo by [Wangsit Nursyahada](https://github.com/wngstnr-code) ([@wnsstt](https://x.com/wnsstt)) — the same operator who deployed the contracts, ran the agents, and shipped the two live in-place upgrades documented above, including the epoch-1 incident response. One person, but a protocol that's already been *operated*, not just demoed.
+
 **Where to follow the build:** [X / Twitter @wnsstt](https://x.com/wnsstt) (active) · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159) · live app [sawitfinance.xyz](https://sawitfinance.xyz)
 
 ---
@@ -290,13 +292,13 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 | Criterion | Implementation |
 |-----------|---------------|
-| Technical Execution | 4 Odra contracts, 31 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
+| Technical Execution | 4 Odra contracts, 42 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
 | Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
-| Working Contracts | 31 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
+| Working Contracts | 42 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
 | Long-Term Launch Plans | Milestone-gated [Launch Plan](#launch-plan) — security review → mainnet → real mill data → decentralized trust; active socials |
 
 ---

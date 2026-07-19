@@ -10,6 +10,9 @@ pub enum TokenError {
     UnauthorizedAuthority = 4,
     TransfersPaused = 5,
     ZeroAmount = 6,
+    // New variants must always be appended at the end — the contract is
+    // upgradable in-place and existing error codes must never shift, or
+    // already-integrated tooling/tests would misinterpret reverts.
 }
 
 #[odra::event]

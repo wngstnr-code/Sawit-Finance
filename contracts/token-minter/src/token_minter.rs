@@ -31,6 +31,9 @@ pub enum MinterError {
     InvalidTokenRate = 8,
     InvalidGorrBps = 9,
     Overflow = 10,
+    // New variants must always be appended at the end — the contract is
+    // upgradable in-place and existing error codes must never shift, or
+    // already-integrated tooling/tests would misinterpret reverts.
 }
 
 #[odra::event]

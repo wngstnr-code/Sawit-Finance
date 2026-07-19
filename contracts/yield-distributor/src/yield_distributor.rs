@@ -38,6 +38,8 @@ pub enum DistError {
     // New variants must always be appended at the end — the contract is
     // upgradable in-place and existing error codes (notably 13) must never
     // shift, or already-integrated tooling/tests would misinterpret reverts.
+    BatchLengthMismatch = 15,
+    OverfundsPool = 16,
 }
 
 #[odra::event]
@@ -201,6 +203,9 @@ impl SawitYieldDistributor {
         amounts: Vec<U512>,
     ) {
         self.assert_authority();
+        if holders.len() != amounts.len() {
+            self.env().revert(DistError::BatchLengthMismatch)
+        }
         let epoch = self.get_epoch_or_revert(epoch_number);
         let mut new_total = self.claimable_total.get_or_default(&epoch_number);
         for (holder, amount) in holders.into_iter().zip(amounts.into_iter()) {
@@ -222,6 +227,9 @@ impl SawitYieldDistributor {
 
         let attached = self.env().attached_value();
         let cumulative = self.funded_amount.get_or_default(&epoch_number) + attached;
+        if cumulative > epoch.total_distribution_cspr {
+            self.env().revert(DistError::OverfundsPool)
+        }
         self.funded_amount.set(&epoch_number, cumulative);
 
         // Preserve the legacy top-up use case: funding may arrive across
@@ -301,6 +309,7 @@ impl SawitYieldDistributor {
 
     pub fn sweep_unclaimed(&mut self, epoch_number: u64) {
         self.assert_authority();
+        let caller = self.env().caller();
 
         let mut epoch = self.get_epoch_or_revert(epoch_number);
 
@@ -328,6 +337,14 @@ impl SawitYieldDistributor {
             + epoch.total_claimed_cspr;
         self.total_distributed_all_time.set(new_total);
 
+        // Send the unclaimed remainder back to the authority so it doesn't
+        // stay locked in the contract purse forever. Historical/over-claimed
+        // epochs (unclaimed == 0, via the checked_sub fallback above) skip
+        // the transfer entirely and remain a bookkeeping-only sweep.
+        if unclaimed > U512::zero() {
+            self.env().transfer_tokens(&caller, &unclaimed);
+        }
+
         self.env().emit_event(EpochSwept {
             epoch_number,
             total_claimed: epoch.total_claimed_cspr,
@@ -339,6 +356,11 @@ impl SawitYieldDistributor {
     pub fn update_yield_router(&mut self, new_router: Address) {
         self.assert_authority();
         self.yield_router.set(new_router);
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        self.assert_authority();
+        self.is_active.set(active);
     }
 
     pub fn set_claim_window(&mut self, window_ms: u64) {
@@ -665,6 +687,149 @@ mod tests {
         let result = dist.try_set_claim_window(0u64);
         assert!(result.is_err());
         assert_eq!(dist.get_claim_window(), DEFAULT_CLAIM_WINDOW);
+    }
+
+    #[test]
+    fn test_set_claimable_batch_length_mismatch_rejected() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let a = env.get_account(2);
+        let b = env.get_account(3);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            2u64,
+            85_000u64,
+        );
+
+        let result = dist.try_set_claimable_batch(
+            1u64,
+            vec![a, b],
+            vec![U512::from(1_000_000_000u64)],
+        );
+        assert!(result.is_err());
+        assert_eq!(dist.get_claimable_total(1u64), U512::zero());
+    }
+
+    #[test]
+    fn test_fund_epoch_overfund_rejected() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+
+        // Overfunding a single call must revert.
+        let over = dist.with_tokens(U512::from(6_000_000_000u64)).try_fund_epoch(1u64);
+        assert!(over.is_err());
+        assert!(!dist.get_epoch(1).unwrap().is_funded);
+
+        // Exact-fill across a partial top-up must still be allowed.
+        dist.with_tokens(U512::from(3_000_000_000u64)).fund_epoch(1u64);
+        let exact_topup = dist.with_tokens(U512::from(2_000_000_000u64)).try_fund_epoch(1u64);
+        assert!(exact_topup.is_ok());
+        assert!(dist.get_epoch(1).unwrap().is_funded);
+
+        // Any further funding on an already fully-funded epoch overflows the pool.
+        let post_full = dist.with_tokens(U512::from(1u64)).try_fund_epoch(1u64);
+        assert!(post_full.is_err());
+    }
+
+    #[test]
+    fn test_sweep_transfers_unclaimed_to_authority() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+        let authority = env.get_account(0);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+
+        env.set_caller(holder);
+        dist.claim_yield(1u64);
+        env.set_caller(authority);
+
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+        let balance_before = env.balance_of(&authority);
+        dist.sweep_unclaimed(1u64);
+        let balance_after = env.balance_of(&authority);
+
+        // 5B pool - 1B claimed = 4B unclaimed swept back to the authority.
+        assert_eq!(balance_after - balance_before, U512::from(4_000_000_000u64));
+    }
+
+    #[test]
+    fn test_sweep_zero_unclaimed_skips_transfer() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+        let authority = env.get_account(0);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(5_000_000_000u64));
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+
+        env.set_caller(holder);
+        dist.claim_yield(1u64);
+        env.set_caller(authority);
+
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+        let balance_before = env.balance_of(&authority);
+        dist.sweep_unclaimed(1u64);
+        let balance_after = env.balance_of(&authority);
+
+        assert!(dist.get_epoch(1).unwrap().is_swept);
+        assert_eq!(balance_after, balance_before);
+    }
+
+    #[test]
+    fn test_inactive_distributor_blocks_create_epoch_and_claim() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+
+        dist.set_active(false);
+
+        let create_blocked = dist.try_create_epoch(
+            "Jul-26".to_string(),
+            U512::from(1_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        assert!(create_blocked.is_err());
+
+        env.set_caller(holder);
+        let claim_blocked = dist.try_claim_yield(1u64);
+        assert!(claim_blocked.is_err());
+        assert!(!dist.has_claimed(1u64, &holder));
     }
 
     #[test]
