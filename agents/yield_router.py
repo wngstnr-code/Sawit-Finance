@@ -731,6 +731,14 @@ async def check_and_trigger(session: aiohttp.ClientSession, state: dict, state_j
 
     deploy_hashes, epoch_number = await submit_distribution(session, plan)
 
+    if not deploy_hashes and epoch_number is None:
+        log.error(
+            f"[ROUTER] Distribution for {epoch_label} did NOT execute on-chain — the fund tx "
+            f"failed (see the [CASPER] error above; commonly an under-funded operator purse). "
+            f"No epoch was funded this cycle."
+        )
+        return False
+
     log.info(f"[ROUTER] 🌴 Yield distribution triggered for {epoch_label}!")
     log.info(f"[ROUTER] {len(holders)} holders will receive yield from {total_cspr_motes/1e9:.0f} CSPR pool")
 
@@ -740,7 +748,7 @@ async def check_and_trigger(session: aiohttp.ClientSession, state: dict, state_j
         except Exception as e:
             log.error(f"[ROUTER] settlement pass raised: {e}", exc_info=True)
     else:
-        log.error("[ROUTER] fund succeeded but epoch number could not be determined — "
+        log.error("[ROUTER] fund tx sent but epoch number could not be parsed — "
                    "settlement skipped this cycle (will need manual set_claimable or a retry)")
 
     return True
