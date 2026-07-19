@@ -21,6 +21,11 @@ export const CSPR_CLICK_APP_ID =
 export const SAWIT_DECIMALS = 0;
 export const CSPR_DECIMALS = 9;
 
+// Deployer/authority account — holds the unissued SAWIT float; excluded from
+// circulating supply when computing distribution yield.
+export const ISSUER_ACCOUNT_HASH =
+  '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec';
+
 export const TREASURY = {
   publicKey: '016410a22de86e0de234120f29272d5b1096caa60b3cf8a3b396d49e5399ad5428',
   accountHash: 'e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe',
@@ -61,5 +66,8 @@ export type ContractState = {
   gorr_bps: number;
   token_rate: number;
   total_sawit_supply: string;
+  // Supply held outside the issuer float and sale treasury — the base for
+  // distribution-yield math. Optional: older snapshots/bridges omit it.
+  circulating_sawit?: string;
   epochs?: EpochInfo[];
 };

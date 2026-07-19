@@ -75,15 +75,19 @@ function runBridge(accountHashHex: string): Promise<Bal> {
 }
 
 export async function GET(req: Request) {
-  const account = (new URL(req.url).searchParams.get('account') || '')
+  const url = new URL(req.url);
+  const account = (url.searchParams.get('account') || '')
     .toLowerCase()
     .replace(/^account-hash-/, '');
   if (!/^[0-9a-f]{64}$/.test(account)) {
     return NextResponse.json({ error: 'invalid account' }, { status: 400 });
   }
 
+  // fresh=1 bypasses the memory cache — used right after a KYC/claim/buy
+  // transaction lands so the UI reflects the new on-chain state immediately.
+  const fresh = url.searchParams.get('fresh') === '1';
   const cached = mem.get(account);
-  if (cached && Date.now() - cached.at < STALE_MS) {
+  if (!fresh && cached && Date.now() - cached.at < STALE_MS) {
     return NextResponse.json({ ...cached.val, cached: true });
   }
 

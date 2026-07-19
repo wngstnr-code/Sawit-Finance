@@ -48,7 +48,7 @@ type InvestorValue = {
   claimable: number | null;
   kycVerified: boolean;
   balLoading: boolean;
-  reload: () => void;
+  reload: (fresh?: boolean) => void;
   idr: number;
   fairValueUsd: number | null;
   cpoHistory: ReturnType<typeof useCpoHistory>;
@@ -127,10 +127,10 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
       setKyc({ phase: 'submitted' });
       recordActivity(publicKey, { type: 'kyc', at: Date.now() });
       // refresh now, then poll a few times while the on-chain tx lands (demo takes ~1min).
-      reload();
-      setTimeout(reload, 10_000);
-      setTimeout(reload, 20_000);
-      setTimeout(reload, 30_000);
+      reload(true);
+      setTimeout(() => reload(true), 10_000);
+      setTimeout(() => reload(true), 20_000);
+      setTimeout(() => reload(true), 30_000);
     } catch (e) {
       setKyc({ phase: 'error', message: humanError(e) });
     }
@@ -148,7 +148,8 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
       if (hash) {
         setClaim({ phase: 'done', hash });
         recordActivity(publicKey, { type: 'claim', hash, at: Date.now() });
-        setTimeout(reload, 4000);
+        setTimeout(() => reload(true), 5_000);
+        setTimeout(() => reload(true), 20_000);
       } else {
         const detail = res
           ? JSON.stringify(res).slice(0, 240)
@@ -174,9 +175,9 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
         if (hash) {
           setBuy({ phase: 'done', hash });
           recordActivity(publicKey, { type: 'buy', hash, at: Date.now() });
-          setTimeout(reload, 15_000);
-          setTimeout(reload, 45_000);
-          setTimeout(reload, 90_000);
+          setTimeout(() => reload(true), 15_000);
+          setTimeout(() => reload(true), 45_000);
+          setTimeout(() => reload(true), 90_000);
         } else {
           const detail = res
             ? JSON.stringify(res).slice(0, 240)

@@ -150,11 +150,18 @@ export default function RwaSection() {
   const fundedSeries = fundedEpochs.map((e) => fromBaseUnits(e.total_distribution_cspr, CSPR_DECIMALS));
   const totalFundedCspr = fundedSeries.reduce((a, b) => a + b, 0);
 
-  // Distribution yield: total CSPR distributed to date per SAWIT, expressed as
-  // a percentage of the fixed treasury price — same proxy used in ExploreView.
+  // Distribution yield: total CSPR distributed to date per circulating SAWIT
+  // (issuer float and sale treasury excluded — yield accrues to holders, not
+  // to unsold inventory), as a percentage of the fixed treasury price. Same
+  // proxy used in ExploreView. Falls back to total supply when the snapshot
+  // predates the circulating_sawit field.
   const distributed = distributedCspr(s, CSPR_DECIMALS);
+  const circulating = s?.circulating_sawit
+    ? fromBaseUnits(s.circulating_sawit, SAWIT_DECIMALS)
+    : 0;
+  const yieldBase = circulating > 0 ? circulating : sawitSupply;
   const distYieldPct =
-    s && sawitSupply > 0 && distributed > 0 ? (distributed / sawitSupply / SALE.priceCspr) * 100 : null;
+    s && yieldBase > 0 && distributed > 0 ? (distributed / yieldBase / SALE.priceCspr) * 100 : null;
 
   const products: {
     key: ProductKey;

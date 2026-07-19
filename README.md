@@ -195,7 +195,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 
 ```bash
 # 1. Contracts — run all tests incl. the full e2e pipeline (no node needed)
-cargo +nightly-2026-01-01 test            # 28 tests, incl. record→mint→KYC→claim
+cargo +nightly-2026-01-01 test            # 31 tests, incl. record→mint→KYC→claim
 
 # 2. Agents
 python3 -m venv .venv && ./.venv/bin/pip install -r agents/requirements.txt
@@ -290,13 +290,13 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 | Criterion | Implementation |
 |-----------|---------------|
-| Technical Execution | 4 Odra contracts, 28 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
+| Technical Execution | 4 Odra contracts, 31 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
 | Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
-| Working Contracts | 28 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
+| Working Contracts | 31 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
 | Long-Term Launch Plans | Milestone-gated [Launch Plan](#launch-plan) — security review → mainnet → real mill data → decentralized trust; active socials |
 
 ---

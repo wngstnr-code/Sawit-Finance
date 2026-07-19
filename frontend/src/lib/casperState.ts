@@ -1,4 +1,4 @@
-import { NETWORK, CONTRACTS } from './config';
+import { NETWORK, CONTRACTS, ISSUER_ACCOUNT_HASH, TREASURY } from './config';
 import type { ContractStateWithEpochs, EpochEntry } from './stateSnapshot';
 
 /**
@@ -164,7 +164,7 @@ const u64Key = (n: bigint | number) => {
 const VAULT = { epoch_count: 3, total_tons: 5, epochs: 8, kyc: 9, oracle_total_score: 10, oracle_submissions: 11 };
 const TOKEN = { total_supply: 4, balances: 5 };
 const MINTER = { token_rate: 4, gorr_bps: 5, total_minted: 6, epoch_mints: 10 };
-const DIST = { current_epoch: 4, total_distributed: 6, epochs: 9, claimable: 10 };
+const DIST = { current_epoch: 4, total_distributed: 6, epochs: 9, claimable: 10, claimed: 11 };
 
 export async function readChainState(): Promise<ContractStateWithEpochs> {
   const srh = await stateRootHash();
@@ -263,6 +263,17 @@ export async function readChainState(): Promise<ContractStateWithEpochs> {
     });
   }
 
+  // Circulating supply = total minus the issuer float and the sale treasury —
+  // the honest denominator for distribution-yield math.
+  const [issuerBalB, treasuryBalB] = await Promise.all([
+    readRaw(srh, token, TOKEN.balances, accountKey(ISSUER_ACCOUNT_HASH)),
+    readRaw(srh, token, TOKEN.balances, accountKey(TREASURY.accountHash)),
+  ]);
+  const issuerBal = issuerBalB ? new R(issuerBalB).big() : 0n;
+  const treasuryBal = treasuryBalB ? new R(treasuryBalB).big() : 0n;
+  const nonCirculating = issuerBal + treasuryBal;
+  const circulating = totalSupply > nonCirculating ? totalSupply - nonCirculating : 0n;
+
   const cur = epochs.find((e) => e.epoch_number === Number(curEpoch));
   return {
     epoch_count: Number(epochCount),
@@ -281,6 +292,7 @@ export async function readChainState(): Promise<ContractStateWithEpochs> {
     gorr_bps: gorrBps,
     token_rate: Number(tokenRate),
     total_sawit_supply: totalSupply.toString(),
+    circulating_sawit: circulating.toString(),
     epochs,
   };
 }
@@ -298,14 +310,18 @@ export async function readAccountState(accountHashHex: string): Promise<{ balanc
   const ck = accountKey(accountHashHex);
   const curB = await readRaw(srh, dist, DIST.current_epoch);
   const cur = curB ? new R(curB).u64() : 0n;
-  const [balB, kycB, clB] = await Promise.all([
+  const [balB, kycB, clB, cdB] = await Promise.all([
     readRaw(srh, token, TOKEN.balances, ck),
     readRaw(srh, vault, VAULT.kyc, ck),
     readRaw(srh, dist, DIST.claimable, Buffer.concat([u64Key(cur), ck])),
+    readRaw(srh, dist, DIST.claimed, Buffer.concat([u64Key(cur), ck])),
   ]);
+  // The contract keeps `claimable` as a historical record and marks `claimed`
+  // separately — a claimed epoch must read as nothing-left-to-claim here.
+  const alreadyClaimed = cdB ? new R(cdB).bool() : false;
   return {
     balance: balB ? Number(new R(balB).big()) : 0,
-    claimable_motes: clB ? new R(clB).big().toString() : '0',
+    claimable_motes: alreadyClaimed || !clB ? '0' : new R(clB).big().toString(),
     kyc_verified: kycB ? new R(kycB).bool() : false,
   };
 }

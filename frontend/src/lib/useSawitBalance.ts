@@ -18,7 +18,7 @@ export function useSawitBalance(publicKey?: string) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     if (!publicKey) {
       setBalance(null);
       setClaimable(null);
@@ -29,9 +29,10 @@ export function useSawitBalance(publicKey?: string) {
     setErr(null);
     try {
       const accountHash = accountHashFromPublicKey(publicKey);
-      const r = await fetch(`/api/balance?account=${accountHash}`, {
-        cache: 'no-store',
-      });
+      const r = await fetch(
+        `/api/balance?account=${accountHash}${fresh ? '&fresh=1' : ''}`,
+        { cache: 'no-store' }
+      );
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'balance read failed');
       setBalance(Number(j.balance ?? 0));

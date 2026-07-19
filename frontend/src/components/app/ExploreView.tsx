@@ -51,8 +51,16 @@ export default function ExploreView() {
   // pre-computed annualized figure, so this is derived locally from state — a
   // reasonable proxy given a single fixed price point rather than an order-book mark.
   const epochsFunded = state?.epochs?.filter((e) => e.funded).length ?? state?.epoch_count ?? 0;
+  // Denominator: circulating SAWIT (issuer float + sale treasury excluded);
+  // falls back to total supply for snapshots predating circulating_sawit.
+  const circulating = state?.circulating_sawit
+    ? fromBaseUnits(state.circulating_sawit, SAWIT_DECIMALS)
+    : 0;
+  const yieldBase = circulating > 0 ? circulating : supply;
   const distYieldPct =
-    state && supply > 0 && distributed > 0 ? (distributed / supply / SALE.priceCspr) * 100 : null;
+    state && yieldBase > 0 && distributed > 0
+      ? (distributed / yieldBase / SALE.priceCspr) * 100
+      : null;
 
   // Historical fair value per SAWIT — the CPO price series pushed through the
   // same on-chain formula as the live scalar: price × 10 000 / (token_rate × gorr_bps).

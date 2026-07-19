@@ -10,7 +10,8 @@ import { ToolColumns, ToolIntro, ContractRow, HistoryPanel, PageHead, ConnectPro
 
 export default function KycView() {
   const { t } = useLocale();
-  const { publicKey, connected, kycVerified, kyc, reload, handleVerifyKyc } = useInvestor();
+  const { publicKey, connected, kycVerified, kyc, balLoading, reload, handleVerifyKyc } =
+    useInvestor();
 
   // While waiting on the vault authority, poll chain state so the view flips
   // to "Verified" on its own the moment KYC is authorized on-chain (no
@@ -18,7 +19,7 @@ export default function KycView() {
   const pending = kyc.phase === 'submitted' && !kycVerified;
   useEffect(() => {
     if (!pending) return;
-    const id = setInterval(reload, 10_000);
+    const id = setInterval(() => reload(true), 10_000);
     return () => clearInterval(id);
   }, [pending, reload]);
 
@@ -28,6 +29,19 @@ export default function KycView() {
       <div className="mx-auto max-w-xl space-y-6">
         <PageHead title={t.app.kyc.title} sub={t.app.kyc.pendingSub} />
         <ConnectPrompt title={t.app.connect.kycTitle} body={t.app.connect.kycBody} />
+      </div>
+    );
+  }
+
+  // Still reading the on-chain KYC flag — don't flash the application form at
+  // an already-verified holder (it reads as "your KYC was lost").
+  if (balLoading && !kycVerified && kyc.phase === 'idle') {
+    return (
+      <div className="mx-auto max-w-xl space-y-6">
+        <PageHead title={t.app.kyc.title} sub={t.app.kyc.pendingSub} />
+        <Card className="p-8 text-center">
+          <p className="text-[14px] text-muted">{t.app.claim.checking}</p>
+        </Card>
       </div>
     );
   }
