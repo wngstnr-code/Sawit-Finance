@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -144,7 +144,16 @@ def _read_state_blocking() -> Optional[ContractState]:
     for line in proc.stdout.splitlines():
         if line.startswith("SAWIT_STATE_JSON "):
             d = json.loads(line[len("SAWIT_STATE_JSON "):])
-            return ContractState(**d)
+            # read_state may emit fields this agent doesn't model (e.g. `epochs`,
+            # `max_tons_per_epoch` added by later contract upgrades). Keep only the
+            # keys ContractState declares so a superset schema never crashes the read.
+            known = {f.name for f in fields(ContractState)}
+            filtered = {k: v for k, v in d.items() if k in known}
+            try:
+                return ContractState(**filtered)
+            except TypeError as e:
+                log.warning(f"[ANALYST] read_state JSON schema mismatch ({e}) — using demo state")
+                return None
 
     log.warning(f"[ANALYST] read_state produced no JSON (exit {proc.returncode}): "
                 f"{proc.stderr.strip()[:200]} — using demo state")
