@@ -1,0 +1,22 @@
+{
+  "by_resource": {
+    "/api/kpbn/price": {
+      "paid_via_x402": false,
+      "resource_path": "/api/kpbn/price",
+      "timestamp": "2026-07-19T20:41:22.914988+00:00",
+      "x402_provenance": "unpaid_fallback"
+    },
+    "/api/mpob/benchmark": {
+      "paid_via_x402": false,
+      "resource_path": "/api/mpob/benchmark",
+      "timestamp": "2026-07-19T20:41:22.915502+00:00",
+      "x402_provenance": "unpaid_fallback"
+    }
+  },
+  "latest": {
+    "paid_via_x402": false,
+    "resource_path": "/api/mpob/benchmark",
+    "timestamp": "2026-07-19T20:41:22.915502+00:00",
+    "x402_provenance": "unpaid_fallback"
+  }
+}
