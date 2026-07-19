@@ -684,8 +684,9 @@ def should_trigger_monthly() -> bool:
     return now.day == 1
 
 
-async def check_and_trigger(session: aiohttp.ClientSession, state: dict, state_json: Optional[dict]) -> bool:
-    """Check trigger conditions and execute a full create+fund+settle cycle if met."""
+async def check_and_trigger(session: aiohttp.ClientSession, state: dict, state_json: Optional[dict], force: bool = False) -> bool:
+    """Check trigger conditions and execute a full create+fund+settle cycle if met.
+    `force=True` (manual/demo) bypasses the monthly/price gate and distributes now."""
     now = datetime.now(timezone.utc)
     epoch_label = now.strftime("%b-%y")
 
@@ -694,7 +695,10 @@ async def check_and_trigger(session: aiohttp.ClientSession, state: dict, state_j
 
     should_trigger = False
 
-    if TRIGGER_MODE == "price":
+    if force:
+        log.info("[ROUTER] ⚡ Force mode — bypassing the trigger gate, distributing a fresh epoch now (manual/demo)")
+        should_trigger = True
+    elif TRIGGER_MODE == "price":
         if trigger_price >= PRICE_TRIGGER_CENTS:
             log.info(
                 f"[ROUTER] ✅ Price trigger: ${trigger_price/100:.2f} >= ${PRICE_TRIGGER_CENTS/100:.2f} — DISTRIBUTING"
@@ -755,18 +759,18 @@ def _fail_fast_check_bins() -> None:
         raise SystemExit(1)
 
 
-async def run_cycle(session: aiohttp.ClientSession, state: dict) -> bool:
+async def run_cycle(session: aiohttp.ClientSession, state: dict, force: bool = False) -> bool:
     state_json = read_state()
 
     detect_expired_epochs(state, state_json)
     save_yield_state(state)
 
-    triggered = await check_and_trigger(session, state, state_json)
+    triggered = await check_and_trigger(session, state, state_json, force=force)
     save_yield_state(state)
     return triggered
 
 
-async def main(once: bool = False):
+async def main(once: bool = False, force: bool = False):
     """Run the settlement keeper (continuously, unless once=True)."""
     log.info("Sawit Finance Yield Router / Settlement Keeper (rule-based) starting...")
     log.info(f"Mode          : {TRIGGER_MODE}")
@@ -782,9 +786,9 @@ async def main(once: bool = False):
 
     async with aiohttp.ClientSession() as session:
         if once:
-            log.info(f"[ROUTER] Checking trigger conditions (--once)...")
+            log.info(f"[ROUTER] Checking trigger conditions (--once{', force' if force else ''})...")
             try:
-                await run_cycle(session, state)
+                await run_cycle(session, state, force=force)
             except Exception as e:
                 # A single-cycle CI run should surface problems (insufficient operator
                 # purse — submit_distribution already returns empty for that —, a
@@ -813,5 +817,7 @@ async def main(once: bool = False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sawit Finance yield router / settlement keeper")
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
+    parser.add_argument("--force", action="store_true",
+                        help="bypass the monthly/price trigger and distribute a fresh epoch now (manual/demo)")
     args = parser.parse_args()
-    asyncio.run(main(once=args.once))
+    asyncio.run(main(once=args.once, force=args.force))

@@ -30,6 +30,10 @@ on:
         description: Force one guaranteed on-chain GORR change (for recording)
         type: boolean
         default: true
+      force_yield:
+        description: Force yield_router to distribute a fresh epoch now (bypass monthly gate)
+        type: boolean
+        default: false
   schedule:
     - cron: "17 6 * * *"   # daily — Market Analyst (GORR)
     - cron: "37 6 * * *"   # daily — Allocation (deposit screening)
@@ -52,16 +56,18 @@ jobs:
       - name: Resolve run parameters
         id: flags
         run: |
+          force_yield=false
           case "${{ github.event_name }}:${{ github.event.schedule }}" in
             schedule:"17 6 * * *") agent=market-analyst;   demo=false ;;
             schedule:"37 6 * * *") agent=allocation;        demo=false ;;
             schedule:"0 6 1 * *")  agent=oracle-then-yield; demo=false ;;
             schedule:*)            agent=market-analyst;    demo=false ;;
-            *)                     agent="${{ github.event.inputs.agent }}"; demo="${{ github.event.inputs.demo }}" ;;
+            *)                     agent="${{ github.event.inputs.agent }}"; demo="${{ github.event.inputs.demo }}"; force_yield="${{ github.event.inputs.force_yield }}" ;;
           esac
-          echo "agent=$agent" >> "$GITHUB_OUTPUT"
-          echo "demo=$demo"   >> "$GITHUB_OUTPUT"
-          echo "Resolved: agent=$agent demo=$demo"
+          echo "agent=$agent"             >> "$GITHUB_OUTPUT"
+          echo "demo=$demo"               >> "$GITHUB_OUTPUT"
+          echo "force_yield=$force_yield" >> "$GITHUB_OUTPUT"
+          echo "Resolved: agent=$agent demo=$demo force_yield=$force_yield"
 
       - name: System deps
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
@@ -103,13 +109,14 @@ jobs:
           DEMO_FORCE_GORR: ${{ steps.flags.outputs.demo }}
         run: |
           set -e
+          YF=""; [ "${{ steps.flags.outputs.force_yield }}" = "true" ] && YF="--force"
           case "${{ steps.flags.outputs.agent }}" in
             market-analyst)    python market_analyst_agent.py --once ;;
             oracle)            python oracle_agent.py --once ;;
-            yield-router)      python yield_router.py --once ;;
+            yield-router)      python yield_router.py --once $YF ;;
             allocation)        python allocation_agent.py --once ;;
-            oracle-then-yield) python oracle_agent.py --once && python yield_router.py --once ;;
-            all)               python market_analyst_agent.py --once && python oracle_agent.py --once && python yield_router.py --once && python allocation_agent.py --once ;;
+            oracle-then-yield) python oracle_agent.py --once && python yield_router.py --once $YF ;;
+            all)               python market_analyst_agent.py --once && python oracle_agent.py --once && python yield_router.py --once $YF && python allocation_agent.py --once ;;
             *)                 python market_analyst_agent.py --once ;;
           esac
 
