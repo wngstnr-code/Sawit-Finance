@@ -2,8 +2,10 @@
 
 import { motion } from 'framer-motion';
 import { Reveal } from '@/components/motion/Reveal';
+import { useLocale } from '@/lib/i18n';
 
 export default function BridgeSection() {
+  const { t } = useLocale();
   return (
     <section className="relative overflow-hidden bg-ink py-28 text-center sm:py-36">
       <svg
@@ -32,16 +34,15 @@ export default function BridgeSection() {
         <Reveal>
           <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand-bright">
             <span className="h-px w-5 bg-brand-bright/50" />
-            The bridge
+            {t.bridge.eyebrow}
           </div>
           <h2 className="mx-auto mt-5 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-tighter2 text-bg text-balance sm:text-6xl">
-            Building the bridge between
+            {t.bridge.titleLine1}
             <br />
-            commodities & DeFi.
+            {t.bridge.titleLine2}
           </h2>
           <p className="mx-auto mt-6 max-w-xl font-serif text-lg leading-relaxed text-white/65 sm:text-xl">
-            Indonesia’s commodity backbone, made programmable — production,
-            minting, and yield, all on Casper.
+            {t.bridge.subcopy} <span className="italic text-white/80">{t.bridge.tagline}</span>
           </p>
         </Reveal>
       </div>

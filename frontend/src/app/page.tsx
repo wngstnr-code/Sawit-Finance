@@ -8,6 +8,7 @@ import BeliefSection from '@/components/site/BeliefSection';
 import TechSection from '@/components/site/TechSection';
 import OnChainProof from '@/components/site/OnChainProof';
 import BridgeSection from '@/components/site/BridgeSection';
+import FaqSection from '@/components/site/FaqSection';
 import AccessSection from '@/components/site/AccessSection';
 import SiteFooter from '@/components/site/SiteFooter';
 
@@ -24,6 +25,7 @@ export default function Home() {
         <TechSection />
         <OnChainProof />
         <BridgeSection />
+        <FaqSection />
         <AccessSection />
       </main>
       <SiteFooter />

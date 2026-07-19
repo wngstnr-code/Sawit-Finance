@@ -1,89 +1,59 @@
+'use client';
+
+import Image from 'next/image';
 import { Section } from '@/components/ui/primitives';
 import { Reveal } from '@/components/motion/Reveal';
 import RequestAccess from '@/components/site/RequestAccess';
-
-const STEPS = [
-  {
-    n: '01',
-    t: 'Request access',
-    d: 'Tell us who you are and your intended allocation. No public sale, no swap.',
-  },
-  {
-    n: '02',
-    t: 'Complete KYC',
-    d: 'A licensed operator verifies you — compliance is enforced on-chain at claim.',
-  },
-  {
-    n: '03',
-    t: 'Receive allocation',
-    d: 'SAWIT is issued to your Casper wallet against verified palm-oil production.',
-  },
-];
+import { useLocale } from '@/lib/i18n';
 
 export default function AccessSection() {
+  const { t, locale } = useLocale();
   return (
     <Section id="access" className="py-24 sm:py-32">
       <Reveal>
-        <div className="overflow-hidden rounded-3xl border border-line bg-card shadow-card-lg">
-          <div className="grid gap-10 p-6 sm:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
-            <div className="flex flex-col">
-              <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand">
-                <span className="h-px w-5 bg-brand/40" />
-                For investors
-              </div>
-              <h2 className="mt-4 font-display text-4xl font-semibold tracking-tighter2 text-ink text-balance sm:text-5xl">
-                Access is onboarded, not bought.
-              </h2>
-              <p className="mt-5 max-w-md font-serif text-lg leading-relaxed text-muted sm:text-xl">
-                SAWIT is a permissioned real-world asset. You don&rsquo;t swap for
-                it on an exchange — a licensed operator onboards verified
-                investors and issues tokens against real production. Yield is
-                claimed in CSPR, KYC-gated on-chain.
-              </p>
-
-              <div className="mt-8 flex items-center gap-3">
-                <RequestAccess
-                  context="landing"
-                  className="flex-1 rounded-lg bg-ink px-3 py-3 text-center text-[13px] font-medium text-bg transition-transform hover:-translate-y-0.5 sm:flex-none sm:px-6 sm:text-sm"
-                />
-                <a
-                  href="/app"
-                  className="flex-1 rounded-lg border border-line-2 bg-white px-3 py-3 text-center text-[13px] font-medium text-ink transition-colors hover:border-brand/40 sm:flex-none sm:px-6 sm:text-sm"
-                >
-                  Open the app
-                </a>
-              </div>
-              <p className="mt-4 font-mono text-[12px] text-faint">
-                Primary issuance via the licensed operator · Casper Testnet
-              </p>
-            </div>
-
-            <ol className="flex flex-col justify-center">
-              {STEPS.map((s, i) => (
-                <li key={s.n} className="flex gap-5 pb-9 last:pb-0">
-                  <div className="flex flex-col items-center">
-                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink font-mono text-[13px] text-bg">
-                      {s.n}
-                    </span>
-                    <span
-                      aria-hidden
-                      className={`mt-2 w-px bg-line-2 ${
-                        i < STEPS.length - 1 ? 'flex-1' : 'h-10'
-                      }`}
-                    />
-                  </div>
-                  <div className="pt-1">
-                    <div className="font-display text-base font-semibold text-ink">
-                      {s.t}
-                    </div>
-                    <p className="mt-1 text-[14px] leading-relaxed text-muted">
-                      {s.d}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10 px-6 py-14 text-center shadow-card-lg sm:px-12 sm:py-20">
+          {/* darkened plantation backdrop — lighter than the How-it-works section */}
+          <div className="absolute inset-0 -z-10">
+            <Image
+              src="/hero/plantation.jpg"
+              alt=""
+              fill
+              sizes="100vw"
+              className="object-cover [filter:saturate(0.6)]"
+            />
+            <div className="absolute inset-0 bg-ink/60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/40 to-ink/45" />
           </div>
+
+          <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand-bright">
+            <span className="h-px w-5 bg-brand-bright/50" />
+            {t.access.eyebrow}
+          </div>
+          <h2
+            className={`mt-4 font-display font-semibold tracking-tighter2 text-bg text-balance lg:whitespace-nowrap ${
+              // ID title is longer — scale the font down so the card footprint
+              // stays consistent with EN instead of wrapping to another line.
+              locale === 'id' ? 'text-3xl sm:text-[2.375rem]' : 'text-4xl sm:text-5xl'
+            }`}
+          >
+            {t.access.title}
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl font-serif text-lg leading-relaxed text-white/75 sm:text-xl">
+            {t.access.subcopyBefore}
+            <span className="font-mono text-[15px] text-white">ACCOUNT_HASH</span>
+            {t.access.subcopyAfter}
+          </p>
+
+          <div className="mt-9 flex items-center justify-center">
+            <RequestAccess
+              context="landing"
+              label={t.access.cta}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3 text-[15px] font-medium text-ink transition-all duration-200 hover:-translate-y-0.5"
+            />
+          </div>
+          <p className="mt-5 font-mono text-[12px] text-white/45">
+            {t.access.note}
+          </p>
         </div>
       </Reveal>
     </Section>

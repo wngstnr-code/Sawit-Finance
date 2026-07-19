@@ -1,27 +1,14 @@
+'use client';
+
 import Image from 'next/image';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/Reveal';
-
-const agents = [
-  {
-    name: 'Oracle Agent',
-    role: 'Verifies production',
-    body: 'Pulls the live FRED/IMF palm-oil price, cross-validates GAPKI / KPBN / MPOB, and reasons with Gemini before any data reaches the chain.',
-  },
-  {
-    name: 'Yield Router',
-    role: 'Distributes revenue',
-    body: 'Watches CPO price and autonomously triggers CSPR yield distributions when thresholds are met — a self-driving treasury.',
-  },
-  {
-    name: 'Market Analyst',
-    role: 'Closes the loop',
-    body: 'Reads all four contracts, reasons with Gemini, and tunes the royalty rate on-chain within hard safety rails. READ → REASON → WRITE.',
-  },
-];
+import { useLocale } from '@/lib/i18n';
 
 const stack = ['Casper', 'Odra', 'x402', 'Gemini 2.5', 'CSPR.cloud', 'CEP-18'];
 
 export default function TechSection() {
+  const { t } = useLocale();
+  const agents = t.tech.agents;
   return (
     <section id="agents" className="relative isolate flex min-h-screen flex-col justify-center overflow-hidden bg-ink py-28 sm:py-36">
       <div className="absolute inset-0 -z-10 opacity-30">
@@ -40,14 +27,13 @@ export default function TechSection() {
         <Reveal>
           <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand-bright">
             <span className="h-px w-5 bg-brand-bright/50" />
-            Agentic AI
+            {t.tech.eyebrow}
           </div>
           <h2 className="mt-4 max-w-2xl font-display text-4xl font-semibold tracking-tighter2 text-bg text-balance sm:text-5xl">
-            Yield that runs itself.
+            {t.tech.title}
           </h2>
           <p className="mt-5 max-w-xl font-serif text-lg leading-relaxed text-white/65 sm:text-xl">
-            Three autonomous agents perceive, reason, and act on-chain — the
-            self-driving DeFi the Casper agent economy is built for.
+            {t.tech.subcopy}
           </p>
         </Reveal>
 
@@ -73,14 +59,14 @@ export default function TechSection() {
         <Reveal delay={0.1}>
           <div className="mt-16 flex flex-wrap items-center gap-x-10 gap-y-4 border-t border-white/10 pt-8">
             <span className="text-[12px] uppercase tracking-[0.14em] text-white/40">
-              Built with
+              {t.tech.builtWith}
             </span>
-            {stack.map((t) => (
+            {stack.map((s) => (
               <span
-                key={t}
+                key={s}
                 className="font-display text-[15px] font-medium text-white/55"
               >
-                {t}
+                {s}
               </span>
             ))}
           </div>

@@ -6,6 +6,7 @@ import { geoMercator, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import { Section } from '@/components/ui/primitives';
 import { Reveal } from '@/components/motion/Reveal';
+import { useLocale } from '@/lib/i18n';
 
 const W = 760;
 const H = 440;
@@ -26,6 +27,7 @@ const estates = [
 type Pt = { x: number; y: number; label: string };
 
 export default function BeliefSection() {
+  const { t } = useLocale();
   const [path, setPath] = useState('');
   const [pts, setPts] = useState<Pt[]>([]);
 
@@ -64,16 +66,14 @@ export default function BeliefSection() {
         <Reveal>
           <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand">
             <span className="h-px w-5 bg-brand/40" />
-            What we believe
+            {t.belief.eyebrow}
           </div>
           <h2 className="mt-4 font-display text-4xl font-semibold tracking-tighter2 text-ink text-balance sm:text-5xl">
-            We believe in{' '}
-            <span className="text-brand">verifiable yield</span>.
+            {t.belief.titlePre}
+            <span className="text-brand">{t.belief.titleHighlight}</span>.
           </h2>
           <p className="mt-5 max-w-md font-serif text-lg leading-relaxed text-muted sm:text-xl">
-            Every token traces back to a real harvest, a real price, and a real
-            payout — across estates from Sumatra to Papua. No synthetics, no
-            black boxes. Just production you can audit on-chain.
+            {t.belief.subcopy}
           </p>
         </Reveal>
 
@@ -119,7 +119,7 @@ export default function BeliefSection() {
             </svg>
             {!path && (
               <div className="flex h-[300px] items-center justify-center text-sm text-faint">
-                Loading map…
+                {t.belief.loading}
               </div>
             )}
           </div>

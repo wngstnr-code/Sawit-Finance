@@ -3,15 +3,20 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-const links = [
-  { label: 'How it works', href: '#how' },
-  { label: 'Real-world asset', href: '#rwa' },
-  { label: 'AI agents', href: '#agents' },
-  { label: 'On-chain', href: '#proof' },
-];
+import { useLocale } from '@/lib/i18n';
+import LangToggle from './LangToggle';
 
 export default function SiteNav() {
+  const { t } = useLocale();
   const [scrolled, setScrolled] = useState(false);
+
+  const links = [
+    { label: t.nav.howItWorks, href: '#how' },
+    { label: t.nav.rwa, href: '#rwa' },
+    { label: t.nav.oracle, href: '#agents' },
+    { label: t.nav.onchain, href: '#proof' },
+    { label: t.nav.faq, href: '#faq' },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -35,6 +40,7 @@ export default function SiteNav() {
           </span>
         </Link>
 
+        {/* desktop links */}
         <div className="hidden items-center gap-8 md:flex">
           {links.map((l) => (
             <a
@@ -47,12 +53,16 @@ export default function SiteNav() {
           ))}
         </div>
 
-        <Link
-          href="/app"
-          className="whitespace-nowrap rounded-lg bg-white px-4 py-2.5 text-[14px] font-medium text-ink transition-transform hover:-translate-y-0.5 sm:px-5"
-        >
-          Launch<span className="hidden sm:inline"> App</span>
-        </Link>
+        <div className="flex items-stretch gap-2.5">
+          <LangToggle variant="nav" />
+          <Link
+            href="/app"
+            className="inline-flex min-w-[92px] items-center justify-center whitespace-nowrap rounded-lg bg-white px-4 py-2.5 text-[14px] font-medium text-ink transition-transform hover:-translate-y-0.5 sm:min-w-[136px] sm:px-5"
+          >
+            <span className="sm:hidden">{t.nav.launchShort}</span>
+            <span className="hidden sm:inline">{t.nav.launch}</span>
+          </Link>
+        </div>
       </nav>
     </header>
   );

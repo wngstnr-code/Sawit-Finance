@@ -4,36 +4,21 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Reveal } from '@/components/motion/Reveal';
+import { useLocale } from '@/lib/i18n';
 
-const steps = [
-  {
-    n: '01',
-    title: 'Verify production',
-    body: 'An AI oracle cross-validates CPO output and the live FRED/IMF palm-oil price, then records a verified epoch with an on-chain reputation score.',
-    tag: 'ProductionVault',
-  },
-  {
-    n: '02',
-    title: 'Mint SAWIT',
-    body: 'TokenMinter reads the verified epoch straight from the vault via CPI and mints CEP-18 SAWIT — cryptographically tied to real production.',
-    tag: 'TokenMinter · CPI',
-  },
-  {
-    n: '03',
-    title: 'Fund yield',
-    body: 'Revenue is posted to YieldDistributor as CSPR and a 90-day claim window opens. An AI router can trigger distributions automatically.',
-    tag: 'YieldDistributor',
-  },
-  {
-    n: '04',
-    title: 'Claim CSPR',
-    body: 'KYC-verified holders claim their share of CSPR yield. Compliance is enforced cross-contract — the distributor checks KYC via CPI.',
-    tag: 'claim_yield · KYC',
-  },
+// Stable per-step metadata (number + contract tag); the title/body come from the
+// active locale and are merged in by index.
+const STEP_META = [
+  { n: '01', tag: 'ProductionVault · record_epoch' },
+  { n: '02', tag: 'TokenMinter · CPI' },
+  { n: '03', tag: 'YieldDistributor · fund_epoch' },
+  { n: '04', tag: 'claim_yield · KYC' },
 ];
 
 export default function HowItWorks() {
+  const { t } = useLocale();
   const [active, setActive] = useState(0);
+  const steps = STEP_META.map((m, i) => ({ ...m, ...t.how.steps[i] }));
 
   return (
     <section
@@ -49,10 +34,10 @@ export default function HowItWorks() {
         <Reveal className="max-w-2xl">
           <div className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-brand-bright">
             <span className="h-px w-5 bg-brand-bright/50" />
-            How it works
+            {t.how.eyebrow}
           </div>
           <h2 className="mt-4 font-display text-4xl font-semibold tracking-tighter2 text-bg text-balance sm:text-5xl">
-            From the harvest to your wallet, fully on-chain.
+            {t.how.title}
           </h2>
         </Reveal>
 
