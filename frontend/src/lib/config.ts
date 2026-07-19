@@ -21,6 +21,29 @@ export const CSPR_CLICK_APP_ID =
 export const SAWIT_DECIMALS = 0;
 export const CSPR_DECIMALS = 9;
 
+export const TREASURY = {
+  publicKey: '016410a22de86e0de234120f29272d5b1096caa60b3cf8a3b396d49e5399ad5428',
+  accountHash: 'e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe',
+} as const;
+
+export const SALE = {
+  priceCspr: 10, // 1 SAWIT = 10 CSPR
+  buyMemoId: 5417, // transfer id penanda pembelian
+  minCspr: 10, // minimal beli = 1 SAWIT
+} as const;
+
+export type EpochInfo = {
+  epoch_number: number;
+  tons_cpo: number;
+  revenue_usd: number;
+  epoch_timestamp: number;
+  tokens_minted: string | null;
+  funded: boolean;
+  total_distribution_cspr: string;
+  total_claimed_cspr: string;
+  claim_deadline_ms: number;
+};
+
 export type ContractState = {
   epoch_count: number;
   oracle_reputation: number;
@@ -38,4 +61,5 @@ export type ContractState = {
   gorr_bps: number;
   token_rate: number;
   total_sawit_supply: string;
+  epochs?: EpochInfo[];
 };

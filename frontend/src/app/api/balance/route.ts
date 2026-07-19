@@ -2,20 +2,23 @@ import { NextResponse } from 'next/server';
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { readAccountState } from '@/lib/casperState';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 180;
 
-type Bal = { balance: number; claimable_motes: string };
+type Bal = { balance: number; claimable_motes: string; kyc_verified: boolean };
 
 const BALANCE_SNAPSHOT: Record<string, Bal> = {
   e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe: {
     balance: 100,
     claimable_motes: '25000000000',
+    kyc_verified: false,
   },
   '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec': {
     balance: 2_259_900,
     claimable_motes: '0',
+    kyc_verified: false,
   },
 };
 
@@ -51,7 +54,7 @@ function runBridge(accountHashHex: string): Promise<Bal> {
     BALANCE_ACCOUNT: `account-hash-${accountHashHex}`,
   };
   return new Promise((resolve, reject) => {
-    execFile(bin, { env, timeout: 110_000, maxBuffer: 1 << 20 }, (err, stdout) => {
+    execFile(bin, { env, timeout: 170_000, maxBuffer: 1 << 20 }, (err, stdout) => {
       if (err) return reject(err);
       const line = stdout
         .split('\n')
@@ -62,6 +65,7 @@ function runBridge(accountHashHex: string): Promise<Bal> {
         resolve({
           balance: Number(j.balance),
           claimable_motes: String(j.claimable_motes ?? '0'),
+          kyc_verified: Boolean(j.kyc_verified ?? false),
         });
       } catch (e) {
         reject(e);
@@ -84,11 +88,21 @@ export async function GET(req: Request) {
   }
 
   try {
-    const val = await runBridge(account);
+    // Pure-RPC reader first (serverless-safe, seconds); Rust bridge fallback.
+    let val: Bal;
+    try {
+      val = await readAccountState(account);
+    } catch {
+      val = await runBridge(account);
+    }
     mem.set(account, { val, at: Date.now() });
     return NextResponse.json(val);
   } catch {
-    const snap = BALANCE_SNAPSHOT[account] ?? { balance: 0, claimable_motes: '0' };
+    const snap = BALANCE_SNAPSHOT[account] ?? {
+      balance: 0,
+      claimable_motes: '0',
+      kyc_verified: false,
+    };
     return NextResponse.json({ ...snap, snapshot: true });
   }
 }

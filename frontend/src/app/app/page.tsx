@@ -1,5 +1,5 @@
-import InvestorDashboard from '@/components/app/InvestorDashboard';
+import ExploreView from '@/components/app/ExploreView';
 
 export default function AppPage() {
-  return <InvestorDashboard />;
+  return <ExploreView />;
 }

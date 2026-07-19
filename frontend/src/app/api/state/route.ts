@@ -3,9 +3,10 @@ import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { STATE_SNAPSHOT } from '@/lib/stateSnapshot';
+import { readChainState } from '@/lib/casperState';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const CACHE = path.resolve(process.cwd(), '.state-cache.json');
 const STALE_MS = 60_000;
@@ -58,12 +59,13 @@ function runBridge(): Promise<Record<string, unknown>> {
   if (!existsSync(bin)) return Promise.reject(new Error('read_state binary not found'));
   const env = { ...process.env, ...loadEnvFile(envFile) };
   return new Promise((resolve, reject) => {
-    execFile(bin, { env, timeout: 110_000, maxBuffer: 1 << 20 }, (err, stdout) => {
+    execFile(bin, { env, timeout: 170_000, maxBuffer: 1 << 20 }, (err, stdout) => {
       if (err) return reject(err);
       const line = stdout.split('\n').find((l) => l.startsWith('SAWIT_STATE_JSON '));
       if (!line) return reject(new Error('no SAWIT_STATE_JSON'));
       try {
-        resolve(JSON.parse(line.slice('SAWIT_STATE_JSON '.length)));
+        const parsed = JSON.parse(line.slice('SAWIT_STATE_JSON '.length));
+        resolve({ ...parsed, epochs: parsed.epochs ?? [] });
       } catch (e) {
         reject(e);
       }
@@ -71,11 +73,23 @@ function runBridge(): Promise<Record<string, unknown>> {
   });
 }
 
+// Primary reader: pure JSON-RPC against the public node (lib/casperState.ts)
+// — serverless-safe and takes seconds, so production serves LIVE chain state.
+// The Rust bridge stays as a cross-check fallback for local dev; the static
+// snapshot is the last resort only.
+async function readLive(): Promise<Record<string, unknown>> {
+  try {
+    return (await readChainState()) as unknown as Record<string, unknown>;
+  } catch {
+    return runBridge();
+  }
+}
+
 let refreshing = false;
 function refreshInBackground() {
   if (refreshing) return;
   refreshing = true;
-  runBridge()
+  readLive()
     .then((s) => saveCache(s))
     .catch(() => {})
     .finally(() => {
@@ -89,14 +103,14 @@ export async function GET() {
   if (cached) {
     if (Date.now() - cached.at > STALE_MS) refreshInBackground();
     return NextResponse.json({
-      state: cached.state,
+      state: { ...cached.state, epochs: cached.state.epochs ?? [] },
       readAt: cached.at,
       cached: true,
     });
   }
 
   try {
-    const state = await runBridge();
+    const state = await readLive();
     saveCache(state);
     return NextResponse.json({ state, readAt: Date.now() });
   } catch {
