@@ -19,6 +19,7 @@ ENV_FILE = os.path.join(ROOT, ".env")
 STATE_CACHE = os.path.join(ROOT, "frontend", ".state-cache.json")
 READ_STATE_BIN = os.path.join(ROOT, "target", "release", "read_state")
 READ_BALANCE_BIN = os.path.join(ROOT, "target", "release", "read_balance")
+ORACLE_PROVENANCE_FILE = os.path.join(ROOT, "agents", ".oracle_provenance.json")
 EXPLORER = "https://testnet.cspr.live"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=PPOILUSDM"
 
@@ -123,6 +124,28 @@ def _state(refresh: bool = False) -> dict:
 
     return _live_read()
 
+def _x402_provenance() -> dict:
+    """Read the latest x402 fetch provenance written by oracle_agent.py (fetch_via_x402);
+    surfaces whether the most recent CPO data was actually paid for on-chain via x402, or
+    silently degraded to a representative fallback. Handles a missing/unreadable file
+    gracefully — this is best-effort visibility, not a source of truth."""
+    if not os.path.exists(ORACLE_PROVENANCE_FILE):
+        return {"x402_provenance": "unknown", "paid_via_x402": None, "note": "no provenance file yet — oracle_agent.py has not run"}
+    try:
+        with open(ORACLE_PROVENANCE_FILE) as f:
+            blob = json.load(f)
+        latest = blob.get("latest", {})
+        if not latest:
+            return {"x402_provenance": "unknown", "paid_via_x402": None}
+        return {
+            "x402_provenance": latest.get("x402_provenance", "unknown"),
+            "paid_via_x402": latest.get("paid_via_x402"),
+            "resource_path": latest.get("resource_path"),
+            "timestamp": latest.get("timestamp"),
+        }
+    except (OSError, json.JSONDecodeError):
+        return {"x402_provenance": "unknown", "paid_via_x402": None}
+
 def _account_hash(public_key_hex: str) -> str:
     """Casper account-hash = blake2b256( algo_name + 0x00 + key_bytes )."""
     pk = public_key_hex.lower()
@@ -175,7 +198,9 @@ def get_oracle_reputation() -> dict:
 
 @mcp.tool()
 def get_palm_oil_price() -> dict:
-    """Live palm-oil price the oracle anchors on — FRED PPOILUSDM (IMF, USD/metric ton)."""
+    """Live palm-oil price the oracle anchors on — FRED PPOILUSDM (IMF, USD/metric ton).
+    Also surfaces the most recent x402 payment provenance for the oracle's gated CPO
+    data (KPBN/MPOB): "official", "reference", "unpaid_fallback", or "unknown"."""
     with urllib.request.urlopen(FRED_CSV, timeout=20) as r:
         text = r.read().decode()
     rows = list(csv.reader(io.StringIO(text)))[1:]
@@ -186,6 +211,7 @@ def get_palm_oil_price() -> dict:
         "date": date,
         "price_usd_per_ton": round(price, 2),
         "observations": len(obs),
+        "x402": _x402_provenance(),
     }
 
 @mcp.tool()
@@ -213,11 +239,16 @@ def get_contracts() -> dict:
 
 @mcp.tool()
 def get_economic_loop() -> list:
-    """The full economic loop executed live on Casper Testnet with real tx hashes and explorer links."""
-    return [
+    """The full economic loop executed live on Casper Testnet with real tx hashes and explorer
+    links. The final entry (record_production) also carries the latest x402 payment
+    provenance for the oracle's gated CPO data, so callers don't need a separate tool."""
+    steps = [
         {**step, "explorer": f"{EXPLORER}/transaction/{step['tx']}"}
         for step in ECONOMIC_LOOP
     ]
+    if steps and steps[0].get("step") == "record_production":
+        steps[0] = {**steps[0], "x402": _x402_provenance()}
+    return steps
 
 @mcp.tool()
 def refresh_protocol_state() -> dict:

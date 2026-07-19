@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,7 @@ SET_GORR_BIN = os.getenv(
     "SET_GORR_BIN", str(REPO_ROOT / "target" / "release" / "set_gorr")
 )
 LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
+MARKET_STATE_FILE = REPO_ROOT / "agents" / ".market_state.json"
 
 PRODUCTION_VAULT_CONTRACT = os.getenv("PRODUCTION_VAULT_CONTRACT", "")
 YIELD_DISTRIBUTOR_CONTRACT = os.getenv("YIELD_DISTRIBUTOR_CONTRACT", "")
@@ -46,9 +48,36 @@ AUTONOMY_MODE = os.getenv("AUTONOMY_MODE", "off").lower() == "on"
 MAX_GORR_CHANGE_BPS = int(os.getenv("MAX_GORR_CHANGE_BPS", "100"))
 MIN_GORR_BPS = int(os.getenv("MIN_GORR_BPS", "100"))
 MAX_GORR_BPS = int(os.getenv("MAX_GORR_BPS", "1000"))
+# Safety rail: minimum wall-clock time between two on-chain GORR changes, regardless of
+# how often the analysis cycle runs — protects against Gemini flip-flopping the rate on
+# back-to-back cycles.
+GORR_CHANGE_COOLDOWN_SECONDS = int(os.getenv("GORR_CHANGE_COOLDOWN_SECONDS", "86400"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+
+def load_market_state() -> dict:
+    """Small local state file for this agent (currently: cooldown timestamp of the last
+    on-chain GORR change). Separate from the on-chain state read via read_state."""
+    if MARKET_STATE_FILE.exists():
+        try:
+            with open(MARKET_STATE_FILE) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            log.warning(f"[STATE] failed to load {MARKET_STATE_FILE}: {e} — starting fresh")
+    return {}
+
+
+def save_market_state(state: dict) -> None:
+    """Atomic write (tmp file + os.replace) so a crash mid-write never leaves a corrupt file."""
+    tmp_path = MARKET_STATE_FILE.with_suffix(MARKET_STATE_FILE.suffix + ".tmp")
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(state, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, MARKET_STATE_FILE)
+    except OSError as e:
+        log.error(f"[STATE] failed to write {MARKET_STATE_FILE}: {e}")
+
 
 @dataclass
 class ContractState:
@@ -327,6 +356,20 @@ async def apply_gorr_onchain(
         )
         return None
 
+    market_state = load_market_state()
+    last_change_ts = market_state.get("last_gorr_change_ts")
+    if last_change_ts is not None:
+        elapsed = time.time() - float(last_change_ts)
+        if elapsed < GORR_CHANGE_COOLDOWN_SECONDS:
+            remaining = GORR_CHANGE_COOLDOWN_SECONDS - elapsed
+            log.warning(
+                f"[AUTONOMY] GORR change cooldown active — last on-chain change was "
+                f"{elapsed/3600:.1f}h ago (cooldown {GORR_CHANGE_COOLDOWN_SECONDS/3600:.0f}h). "
+                f"SKIPPING on-chain write; would need {remaining/3600:.1f}h more. "
+                f"Recommendation was {current_gorr} → {safe_gorr} bps."
+            )
+            return None
+
     log.info(f"[AUTONOMY] 🤖 Autonomously updating GORR {current_gorr} → {safe_gorr} bps on-chain...")
 
     if not os.path.exists(SET_GORR_BIN):
@@ -357,6 +400,11 @@ async def apply_gorr_onchain(
         log.info(f"[AUTONOMY]    https://testnet.cspr.live/transaction/{deploy_hash}")
     else:
         log.info("[AUTONOMY] ✅ GORR updated on-chain (tx hash not parsed from output)")
+
+    market_state["last_gorr_change_ts"] = time.time()
+    market_state["last_gorr_change_deploy"] = deploy_hash
+    save_market_state(market_state)
+
     return deploy_hash
 
 def format_report(state: ContractState, analysis: dict, timestamp: str) -> str:

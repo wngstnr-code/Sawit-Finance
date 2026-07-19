@@ -62,6 +62,36 @@ if GEMINI_API_KEY:
 MAX_SOURCE_DIVERGENCE_PCT = 10.0
 MIN_VALIDATION_SCORE = 60
 
+ORACLE_PROVENANCE_FILE = REPO_ROOT / "agents" / ".oracle_provenance.json"
+
+def _persist_x402_provenance(resource_path: str, provenance: str, paid: bool) -> None:
+    """Atomically persist the latest x402 fetch provenance (per resource) so other
+    processes (e.g. mcp_server.py) can surface whether the most recent oracle data was
+    actually paid for via x402, or silently degraded to a representative fallback."""
+    record = {
+        "resource_path": resource_path,
+        "x402_provenance": provenance,
+        "paid_via_x402": paid,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        existing = {}
+        if ORACLE_PROVENANCE_FILE.exists():
+            try:
+                with open(ORACLE_PROVENANCE_FILE) as f:
+                    existing = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                existing = {}
+        existing["latest"] = record
+        existing.setdefault("by_resource", {})[resource_path] = record
+
+        tmp_path = ORACLE_PROVENANCE_FILE.with_suffix(ORACLE_PROVENANCE_FILE.suffix + ".tmp")
+        with open(tmp_path, "w") as f:
+            json.dump(existing, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, ORACLE_PROVENANCE_FILE)
+    except OSError as e:
+        log.error(f"[x402] failed to persist provenance to {ORACLE_PROVENANCE_FILE}: {e}")
+
 @dataclass
 class CpoProductionData:
     epoch_label: str
@@ -186,24 +216,33 @@ async def fetch_via_x402(
     session: aiohttp.ClientSession,
     resource_path: str,
 ) -> Optional[dict]:
-    """Fetch a gated CPO resource: official x402 protocol first, then the from-scratch reference client; returns JSON or None (caller falls back to a representative reading)."""
+    """Fetch a gated CPO resource: official x402 protocol first, then the from-scratch reference
+    client; returns JSON or None (caller falls back to a representative reading). Provenance
+    ("official" / "reference" / "unpaid_fallback") is logged and persisted to
+    agents/.oracle_provenance.json for downstream visibility (see mcp_server.py)."""
     data = await fetch_via_x402_official(session, resource_path)
     if data is not None:
+        _persist_x402_provenance(resource_path, "official", True)
         return data
 
-    if not (X402_LIVE and X402_AVAILABLE and _x402_payer is not None):
-        return None
+    if X402_LIVE and X402_AVAILABLE and _x402_payer is not None:
+        url = f"{X402_FACILITATOR_URL}{resource_path}"
+        try:
+            log.info(f"[x402] Paying for {resource_path} (reference client)...")
+            data = await fetch_with_x402(session, url, _x402_payer, X402_MAX_MOTES)
+            log.info(f"[x402] ✅ Paid + received {resource_path}")
+            _persist_x402_provenance(resource_path, "reference", True)
+            return data
+        except X402Error as e:
+            log.warning(f"[x402] Payment/fetch failed for {resource_path}: {e} — using fallback")
+        except Exception as e:
+            log.warning(f"[x402] Facilitator unreachable ({e}) — using fallback")
 
-    url = f"{X402_FACILITATOR_URL}{resource_path}"
-    try:
-        log.info(f"[x402] Paying for {resource_path} (reference client)...")
-        data = await fetch_with_x402(session, url, _x402_payer, X402_MAX_MOTES)
-        log.info(f"[x402] ✅ Paid + received {resource_path}")
-        return data
-    except X402Error as e:
-        log.warning(f"[x402] Payment/fetch failed for {resource_path}: {e} — using fallback")
-    except Exception as e:
-        log.warning(f"[x402] Facilitator unreachable ({e}) — using fallback")
+    log.error(
+        f"[x402] DATA NOT PAID VIA X402 — using representative values for {resource_path} "
+        "(neither the official protocol nor the reference client produced paid data)"
+    )
+    _persist_x402_provenance(resource_path, "unpaid_fallback", False)
     return None
 
 def compute_validation_score(readings: list[SourceReading]) -> tuple[int, int, int, str]:

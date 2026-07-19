@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-"""Sawit Finance — AI Allocation Agent: watches the treasury account for incoming CSPR
-"buy SAWIT" transfers (native transfer with transfer-id/memo == BUY_MEMO_ID) and, for each
-new one, allocates + sends SAWIT to the buyer via the `allocate` Rust binary."""
+"""Sawit Finance — Allocation Agent: rule-based settlement agent that watches the treasury
+account for incoming CSPR "buy SAWIT" transfers (native transfer with transfer-id/memo ==
+BUY_MEMO_ID) and, for each new one, allocates + sends SAWIT to the buyer via the `allocate`
+Rust binary. Deposit amounts and settlement math are entirely deterministic (no LLM in the
+hot path) — dedup keyed on deploy_hash, price = SAWIT_PRICE_CSPR, floor division, no rounding
+tricks. The one place an LLM is used is *advisory only*: before allocating, an optional Gemini
+call (analyze_deposit_with_gemini) screens each deposit for anomalies (e.g. a single deposit
+far above ALLOC_MAX_AUTO_CSPR, or rapid repeat deposits from the same sender). Deposits it (or
+the deterministic fallback, when no GEMINI_API_KEY is set) flags are NOT auto-allocated — they
+are recorded in state with status "flagged" for manual review, and still deduped by
+deploy_hash so they are not re-flagged every cycle."""
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import json
 import logging
@@ -17,6 +27,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+import google.generativeai as genai
 from dotenv import load_dotenv, dotenv_values
 
 load_dotenv()
@@ -29,6 +40,7 @@ LIVENET_ENV_FILE = Path(os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env")))
 ALLOCATE_BIN = os.getenv("ALLOCATE_BIN", str(REPO_ROOT / "target" / "release" / "allocate"))
 READ_STATE_BIN = os.getenv("READ_STATE_BIN", str(REPO_ROOT / "target" / "release" / "read_state"))
 STATE_FILE = REPO_ROOT / "agents" / ".allocation_state.json"
+STATE_LOCK_FILE = REPO_ROOT / "agents" / ".allocation_state.lock"
 
 CSPR_CLOUD_API = os.getenv("CSPR_CLOUD_API", "https://api.testnet.cspr.cloud")
 CSPR_CLOUD_API_KEY = os.getenv("CSPR_CLOUD_API_KEY", "")
@@ -43,9 +55,54 @@ SALE_EPOCH_ENV = os.getenv("SALE_EPOCH", "").strip()
 # Own var name — CHECK_INTERVAL_SECONDS already belongs to yield_router (hourly).
 CHECK_INTERVAL_SECONDS = int(os.getenv("ALLOCATION_INTERVAL_SECONDS", "60"))
 
+# Advisory LLM anomaly screening (see analyze_deposit_with_gemini docstring).
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+# Deterministic fallback (and hard reference point for the LLM prompt): any single deposit
+# above this many CSPR is flagged for manual review instead of auto-allocated.
+ALLOC_MAX_AUTO_CSPR = int(os.getenv("ALLOC_MAX_AUTO_CSPR", "5000"))
+# Rapid repeat-deposit detection: N+ deposits from the same sender within this window are
+# flagged as a possible anomaly (e.g. retry storms, wash-style behaviour).
+ALLOC_RAPID_REPEAT_WINDOW_SECONDS = int(os.getenv("ALLOC_RAPID_REPEAT_WINDOW_SECONDS", "600"))
+ALLOC_RAPID_REPEAT_COUNT = int(os.getenv("ALLOC_RAPID_REPEAT_COUNT", "3"))
+
 _TREASURY_ACCOUNT_HASH_NORM = TREASURY_ACCOUNT_HASH.replace("account-hash-", "").lower()
 
 _debug_logged_sample = False
+
+
+# ── Cross-process file lock (stdlib fcntl; separate processes, no shared module) ───────────
+
+@contextlib.contextmanager
+def _state_lock(timeout_seconds: float = 10.0, poll_interval: float = 0.2):
+    """Blocking-with-timeout advisory lock on a sidecar .lock file, guarding all reads AND
+    writes of STATE_FILE across the allocation_agent and yield_router processes (both read
+    agents/.allocation_state.json; only allocation_agent writes it). On timeout, logs and
+    yields anyway so callers fall back to their existing "reuse previous/empty snapshot"
+    behaviour rather than deadlocking."""
+    STATE_LOCK_FILE.touch(exist_ok=True)
+    fd = os.open(str(STATE_LOCK_FILE), os.O_RDWR)
+    deadline = time.monotonic() + timeout_seconds
+    acquired = False
+    try:
+        while time.monotonic() < deadline:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                time.sleep(poll_interval)
+        if not acquired:
+            log.warning(f"[LOCK] timed out waiting for {STATE_LOCK_FILE} — proceeding without lock")
+        yield acquired
+    finally:
+        if acquired:
+            with contextlib.suppress(OSError):
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _account_hash_from_public_key(public_key_hex: str) -> str:
@@ -67,21 +124,27 @@ def _normalize_account_hash(value: str) -> str:
 
 
 def load_state() -> dict:
-    if STATE_FILE.exists():
-        try:
-            with open(STATE_FILE) as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
-            log.warning(f"[STATE] failed to load {STATE_FILE}: {e} — starting fresh")
-    return {}
+    with _state_lock():
+        if STATE_FILE.exists():
+            try:
+                with open(STATE_FILE) as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                log.warning(f"[STATE] failed to load {STATE_FILE}: {e} — starting fresh")
+        return {}
 
 
 def save_state(state: dict) -> None:
-    try:
-        with open(STATE_FILE, "w") as f:
-            json.dump(state, f, indent=2, sort_keys=True)
-    except OSError as e:
-        log.error(f"[STATE] failed to write {STATE_FILE}: {e}")
+    """Atomic write (tmp file + os.replace) under the cross-process lock, so a concurrent
+    reader (e.g. yield_router's _load_allocation_holders) never observes a partial file."""
+    with _state_lock():
+        tmp_path = STATE_FILE.with_suffix(STATE_FILE.suffix + ".tmp")
+        try:
+            with open(tmp_path, "w") as f:
+                json.dump(state, f, indent=2, sort_keys=True)
+            os.replace(tmp_path, STATE_FILE)
+        except OSError as e:
+            log.error(f"[STATE] failed to write {STATE_FILE}: {e}")
 
 
 def fetch_transfers(page_size: int = 50) -> list[dict]:
@@ -277,6 +340,100 @@ def run_allocate(epoch: int, investor_account_hash: str, deposit_cspr: int) -> O
     return None
 
 
+def _recent_sender_deposit_count(sender: str, state: dict, window_seconds: int) -> int:
+    """Count how many deposits from `sender` are already recorded in state within the last
+    `window_seconds` — used for rapid-repeat-deposit anomaly detection."""
+    now = time.time()
+    count = 0
+    for entry in state.values():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("investor") != sender:
+            continue
+        ts = entry.get("timestamp")
+        if ts is None:
+            continue
+        try:
+            if now - float(ts) <= window_seconds:
+                count += 1
+        except (TypeError, ValueError):
+            continue
+    return count
+
+
+def _deterministic_anomaly_check(sender: str, deposit_cspr: int, state: dict) -> tuple[bool, str]:
+    """Rule-based anomaly screen used when GEMINI_API_KEY is not configured (or the Gemini
+    call fails). Returns (flagged, reason)."""
+    if deposit_cspr > ALLOC_MAX_AUTO_CSPR:
+        return True, f"deposit {deposit_cspr} CSPR exceeds ALLOC_MAX_AUTO_CSPR={ALLOC_MAX_AUTO_CSPR}"
+
+    repeat_count = _recent_sender_deposit_count(sender, state, ALLOC_RAPID_REPEAT_WINDOW_SECONDS)
+    if repeat_count >= ALLOC_RAPID_REPEAT_COUNT:
+        return True, (
+            f"{repeat_count + 1} deposits from {sender} within "
+            f"{ALLOC_RAPID_REPEAT_WINDOW_SECONDS}s (threshold {ALLOC_RAPID_REPEAT_COUNT})"
+        )
+
+    return False, ""
+
+
+def analyze_deposit_with_gemini(sender: str, deposit_cspr: int, state: dict) -> tuple[bool, str]:
+    """Advisory-only LLM anomaly screen for a single "buy SAWIT" deposit, run before
+    allocation. This does NOT decide the allocation math (that stays fully deterministic in
+    run_allocate/process_transfer) — it only flags deposits for manual review. Falls back to
+    a deterministic rule (_deterministic_anomaly_check) when GEMINI_API_KEY is unset or the
+    call fails, so the agent behaves safely with or without an LLM available. Follows the
+    same genai call pattern as oracle_agent.py::analyze_with_gemini."""
+    if not GEMINI_API_KEY:
+        return _deterministic_anomaly_check(sender, deposit_cspr, state)
+
+    repeat_count = _recent_sender_deposit_count(sender, state, ALLOC_RAPID_REPEAT_WINDOW_SECONDS)
+
+    prompt = f"""You are a settlement-risk screener for Sawit Finance, a platform that lets investors
+buy SAWIT tokens by sending CSPR to a treasury account (tagged with a fixed transfer memo).
+
+Your job: decide if THIS deposit looks anomalous enough to hold for manual review instead of
+being auto-allocated immediately.
+
+DEPOSIT UNDER REVIEW:
+  - Sender account hash : {sender}
+  - Deposit amount       : {deposit_cspr} CSPR
+  - Deposits from this sender in the last {ALLOC_RAPID_REPEAT_WINDOW_SECONDS}s (excluding this one): {repeat_count}
+
+REFERENCE THRESHOLDS (for context, not hard rules — use judgement):
+  - "Normal" retail deposit size for this platform: roughly 10-500 CSPR
+  - Deposits far above {ALLOC_MAX_AUTO_CSPR} CSPR are unusual for a single retail buy
+  - {ALLOC_RAPID_REPEAT_COUNT}+ deposits from the same sender within {ALLOC_RAPID_REPEAT_WINDOW_SECONDS}s is unusual retail behaviour
+    (could be a legitimate large investor, a retry storm, or automated/wash-style activity)
+
+Respond in this exact JSON format:
+{{
+  "flagged": false,
+  "reason": "short reason (empty string if not flagged)"
+}}"""
+
+    try:
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+
+        result = json.loads(raw)
+        flagged = bool(result.get("flagged", False))
+        reason = str(result.get("reason", ""))
+        if flagged:
+            log.warning(f"[GEMINI] deposit from {sender} ({deposit_cspr} CSPR) flagged: {reason}")
+        return flagged, reason
+
+    except Exception as e:
+        log.error(f"[GEMINI] anomaly screen failed: {e} — falling back to deterministic rule")
+        return _deterministic_anomaly_check(sender, deposit_cspr, state)
+
+
 def process_transfer(item: dict, state: dict) -> str:
     """Process a single candidate transfer item. Returns a short status string for logging.
     Mutates `state` in place and saves it (unless the outcome is a retry-worthy exception)."""
@@ -316,6 +473,22 @@ def process_transfer(item: dict, state: dict) -> str:
         }
         save_state(state)
         return "too_small"
+
+    flagged, flag_reason = analyze_deposit_with_gemini(sender, deposit_cspr, state)
+    if flagged:
+        state[deploy_hash] = {
+            "status": "flagged",
+            "timestamp": time.time(),
+            "investor": sender,
+            "deposit_cspr": deposit_cspr,
+            "reason": flag_reason,
+        }
+        save_state(state)
+        log.warning(
+            f"[PROCESS] deploy={deploy_hash} investor={sender} deposit={deposit_cspr} CSPR "
+            f"FLAGGED for manual review: {flag_reason} — NOT auto-allocated"
+        )
+        return "flagged"
 
     epoch = latest_epoch()
     if epoch is None:
@@ -361,7 +534,7 @@ def run_cycle(state: dict) -> None:
         status = process_transfer(item, state)
         outcomes[status] = outcomes.get(status, 0) + 1
 
-    processed = sum(v for k, v in outcomes.items() if k in ("allocated", "failed", "too_small"))
+    processed = sum(v for k, v in outcomes.items() if k in ("allocated", "failed", "too_small", "flagged"))
     log.info(
         f"[CYCLE] seen={len(items)} processed_new={processed} outcomes={outcomes}"
     )

@@ -15,6 +15,8 @@ kills the cycle):
 
 import argparse
 import asyncio
+import contextlib
+import fcntl
 import json
 import logging
 import os
@@ -51,6 +53,7 @@ READ_BALANCE_BIN = os.getenv("READ_BALANCE_BIN", str(REPO_ROOT / "target" / "rel
 LIVENET_ENV_FILE = os.getenv("LIVENET_ENV_FILE", str(REPO_ROOT / ".env"))
 
 ALLOCATION_STATE_FILE = REPO_ROOT / "agents" / ".allocation_state.json"
+ALLOCATION_STATE_LOCK_FILE = REPO_ROOT / "agents" / ".allocation_state.lock"
 YIELD_STATE_FILE = REPO_ROOT / "agents" / ".yield_state.json"
 
 CSPR_CLOUD_API = "https://api.testnet.cspr.cloud"
@@ -102,6 +105,38 @@ class DistributionPlan:
     total_holders: int
 
 
+# ── Cross-process file lock (stdlib fcntl; shared sidecar with allocation_agent.py, no
+# importable common module exists between these separate processes, so this helper is
+# intentionally duplicated there) ───────────────────────────────────────────────────────
+
+@contextlib.contextmanager
+def _allocation_state_lock(timeout_seconds: float = 10.0, poll_interval: float = 0.2):
+    """Blocking-with-timeout advisory lock on ALLOCATION_STATE_LOCK_FILE, guarding reads of
+    agents/.allocation_state.json against a concurrent write from allocation_agent.py. On
+    timeout, logs and yields anyway so the caller falls back to its existing behaviour
+    (reuse previous/empty snapshot) rather than deadlocking."""
+    ALLOCATION_STATE_LOCK_FILE.touch(exist_ok=True)
+    fd = os.open(str(ALLOCATION_STATE_LOCK_FILE), os.O_RDWR)
+    deadline = time.monotonic() + timeout_seconds
+    acquired = False
+    try:
+        while time.monotonic() < deadline:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                time.sleep(poll_interval)
+        if not acquired:
+            log.warning(f"[LOCK] timed out waiting for {ALLOCATION_STATE_LOCK_FILE} — proceeding without lock")
+        yield acquired
+    finally:
+        if acquired:
+            with contextlib.suppress(OSError):
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 # ── Keeper state (idempotency) ──────────────────────────────────────────────
 
 def load_yield_state() -> dict:
@@ -115,9 +150,13 @@ def load_yield_state() -> dict:
 
 
 def save_yield_state(state: dict) -> None:
+    """Atomic write (tmp file + os.replace) so a crash mid-write never leaves a corrupt
+    agents/.yield_state.json — this file is written after every settled holder."""
+    tmp_path = YIELD_STATE_FILE.with_suffix(YIELD_STATE_FILE.suffix + ".tmp")
     try:
-        with open(YIELD_STATE_FILE, "w") as f:
+        with open(tmp_path, "w") as f:
             json.dump(state, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, YIELD_STATE_FILE)
     except OSError as e:
         log.error(f"[STATE] failed to write {YIELD_STATE_FILE}: {e}")
 
@@ -221,16 +260,17 @@ async def get_current_cpo_price(session: aiohttp.ClientSession) -> int:
 def _load_allocation_holders() -> dict[str, int]:
     """Sum allocated SAWIT per investor from agents/.allocation_state.json (status=="allocated").
     Returns {account_hash_without_prefix: total_allocation_units}."""
-    if not ALLOCATION_STATE_FILE.exists():
-        log.warning(f"[SNAPSHOT] {ALLOCATION_STATE_FILE} not found — no investor holders from allocation state")
-        return {}
+    with _allocation_state_lock():
+        if not ALLOCATION_STATE_FILE.exists():
+            log.warning(f"[SNAPSHOT] {ALLOCATION_STATE_FILE} not found — no investor holders from allocation state")
+            return {}
 
-    try:
-        with open(ALLOCATION_STATE_FILE) as f:
-            alloc_state = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        log.error(f"[SNAPSHOT] failed to read {ALLOCATION_STATE_FILE}: {e}")
-        return {}
+        try:
+            with open(ALLOCATION_STATE_FILE) as f:
+                alloc_state = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            log.error(f"[SNAPSHOT] failed to read {ALLOCATION_STATE_FILE}: {e}")
+            return {}
 
     totals: dict[str, int] = {}
     for deploy_hash, entry in alloc_state.items():
