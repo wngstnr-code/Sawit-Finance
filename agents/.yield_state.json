@@ -1,4 +1,14 @@
 {
-  "epochs": {},
+  "epochs": {
+    "4": {
+      "holders": {
+        "account-hash-57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec": {
+          "motes": "100000000000",
+          "status": "done",
+          "ts": "2026-07-19T21:10:01.618761+00:00"
+        }
+      }
+    }
+  },
   "expired": {}
 }
