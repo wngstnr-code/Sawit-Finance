@@ -81,3 +81,7 @@ path = "src/upgrade_dist.rs"
 [[bin]]
 name = "inspect_epoch"
 path = "src/inspect_epoch.rs"
+
+[[bin]]
+name = "set_window"
+path = "src/set_window.rs"

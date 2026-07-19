@@ -34,6 +34,7 @@ pub enum DistError {
     Overflow = 11,
     NotKycVerified = 12,
     ClaimableExceedsPool = 13,
+    InvalidClaimWindow = 14,
     // New variants must always be appended at the end — the contract is
     // upgradable in-place and existing error codes (notably 13) must never
     // shift, or already-integrated tooling/tests would misinterpret reverts.
@@ -74,9 +75,16 @@ pub struct EpochFunded {
     pub timestamp: u64,
 }
 
-const DEFAULT_CLAIM_WINDOW: u64 = 7_776_000_000u64;
+#[odra::event]
+pub struct ClaimWindowUpdated {
+    pub window_ms: u64,
+}
 
-#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept, EpochFunded], errors = DistError)]
+// 30 days, in milliseconds. Applies to epochs created from now on; already
+// stored epochs keep their previously computed claim_deadline untouched.
+const DEFAULT_CLAIM_WINDOW: u64 = 2_592_000_000u64;
+
+#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept, EpochFunded, ClaimWindowUpdated], errors = DistError)]
 pub struct SawitYieldDistributor {
     authority: Var<Address>,
     yield_router: Var<Address>,
@@ -333,6 +341,15 @@ impl SawitYieldDistributor {
         self.yield_router.set(new_router);
     }
 
+    pub fn set_claim_window(&mut self, window_ms: u64) {
+        self.assert_authority();
+        if window_ms == 0 {
+            self.env().revert(DistError::InvalidClaimWindow)
+        }
+        self.claim_window_ms.set(window_ms);
+        self.env().emit_event(ClaimWindowUpdated { window_ms });
+    }
+
     pub fn get_epoch(&self, epoch_number: u64) -> Option<DistributionEpoch> {
         self.epochs.get(&epoch_number)
     }
@@ -363,6 +380,10 @@ impl SawitYieldDistributor {
 
     pub fn get_production_vault(&self) -> Address {
         self.production_vault.get().unwrap()
+    }
+
+    pub fn get_claim_window(&self) -> u64 {
+        self.claim_window_ms.get_or_default()
     }
 
     fn get_epoch_or_revert(&self, epoch_number: u64) -> DistributionEpoch {
@@ -621,5 +642,48 @@ mod tests {
 
         assert!(result.is_err());
         assert!(!dist.has_claimed(1u64, &holder));
+    }
+
+    #[test]
+    fn test_set_claim_window_rejects_non_authority() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        env.set_caller(stranger);
+        let result = dist.try_set_claim_window(1_000u64);
+        assert!(result.is_err());
+        env.set_caller(env.get_account(0));
+        assert_eq!(dist.get_claim_window(), DEFAULT_CLAIM_WINDOW);
+    }
+
+    #[test]
+    fn test_set_claim_window_rejects_zero() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+
+        let result = dist.try_set_claim_window(0u64);
+        assert!(result.is_err());
+        assert_eq!(dist.get_claim_window(), DEFAULT_CLAIM_WINDOW);
+    }
+
+    #[test]
+    fn test_set_claim_window_applies_to_new_epochs() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+
+        let new_window: u64 = 30 * 24 * 60 * 60 * 1000; // 30 days
+        dist.set_claim_window(new_window);
+        assert_eq!(dist.get_claim_window(), new_window);
+
+        dist.create_epoch(
+            "Jul-26".to_string(),
+            U512::from(5_000_000_000u64),
+            10u64,
+            85_000u64,
+        );
+
+        let epoch = dist.get_epoch(1).unwrap();
+        assert_eq!(epoch.claim_deadline, epoch.created_at + new_window);
     }
 }
