@@ -2,6 +2,7 @@
 """Sawit Finance — closed-loop agent demo: reads live protocol state, reasons about GORR, and broadcasts a real TokenMinter.update_config() tx on Casper Testnet."""
 import asyncio
 import os
+import textwrap
 
 os.environ["AUTONOMY_MODE"] = "on"
 
@@ -26,10 +27,20 @@ async def main() -> None:
         print(f"      Oracle reputation : {s.oracle_reputation}/100")
         print(f"      Current GORR      : {gorr} bps  ({gorr/100:.1f}%)")
 
-        target = 500 if gorr >= 510 else 520
-        print("\n[2] REASON — strategy (Gemini · safety band 1%–10%, ±100 bps/cycle)")
-        print(f"      Recommendation    : tune GORR {gorr} → {target} bps")
-        print(f"                          to balance holder yield vs. live CPO revenue")
+        print("\n[2] REASON — live Gemini market analysis…")
+        analysis = await m.run_gemini_analysis(s)
+        target = int(analysis.get("gorr_recommendation_bps", gorr))
+        engine = m.GEMINI_MODEL if m.GEMINI_API_KEY else "deterministic fallback (no GEMINI_API_KEY set)"
+        print(f"      Engine            : {engine}")
+        print(f"      Market sentiment  : {analysis.get('market_sentiment', 'N/A')}")
+        print(f"      Oracle health     : {analysis.get('oracle_health', 'N/A')}")
+        summary = textwrap.fill(
+            str(analysis.get("analysis", "n/a")).strip(),
+            width=52, initial_indent=" " * 26, subsequent_indent=" " * 26,
+        ).lstrip()
+        print(f"      Analysis          : {summary}")
+        print(f"      Recommendation    : GORR {gorr} → {target} bps")
+        print( "                          (safety rails enforced in [3]: band 1%–10%, ±100 bps, 24h cooldown)")
 
         print("\n[3] WRITE  — signing + broadcasting on Casper Testnet…")
         tx = await m.apply_gorr_onchain(session, gorr, target)

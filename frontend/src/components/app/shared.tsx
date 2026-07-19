@@ -105,7 +105,7 @@ export function PhaseNote({ phase }: { phase: Phase }) {
   return null;
 }
 
-/* ── Ondo-style balance hero ─────────────────────────────────────────── */
+/* ── Balance hero (large figure + secondary stats) ───────────────────── */
 
 export function BalanceHero({
   label,
@@ -150,7 +150,7 @@ export function BalanceHero({
   );
 }
 
-/* ── Ondo-style value chart with range toggle ────────────────────────── */
+/* ── Portfolio value chart with range toggle ─────────────────────────── */
 
 // FRED PPOILUSDM is a monthly series (~60 points), so ranges are in months of
 // observations rather than trading days.
@@ -491,7 +491,7 @@ export function KycBanner() {
   );
 }
 
-/* ── Ondo-style holdings rows ────────────────────────────────────────── */
+/* ── Holdings rows (asset · balance · yield) ─────────────────────────── */
 
 export function HoldingsList({ showApy = true }: { showApy?: boolean }) {
   const { t } = useLocale();
@@ -765,7 +765,7 @@ export function PageHead({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-/* ── Ondo "Converter"-style tool layout (left intro · middle action · right history) ── */
+/* ── Three-column tool layout (left intro · middle action · right history) ── */
 
 export function ToolColumns({
   left,

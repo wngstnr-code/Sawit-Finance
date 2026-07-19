@@ -40,10 +40,6 @@ frontend/out/
 .agents/
 skills-lock.json
 
-# Internal planning notes (not for submission repo)
-TANUR-PARITY.md
-TANUR-UI-PLAN.md
-
 graphify-out/
 
 # Agent runtime state (local, per-machine)

@@ -19,7 +19,7 @@ import { useChainState } from '@/lib/useChainState';
 import { useCpoHistory } from '@/lib/useCpoHistory';
 import { useLocale } from '@/lib/i18n';
 
-// Ondo-style product accordion: the selected product expands into a full card
+// Product accordion: the selected product expands into a full card
 // on the left while the right stats panel swaps to that product's data.
 //   0ms  closing card collapses / opening card expands (mirrored tween)
 //   0ms  right panel cross-fades to the selected product (fade + slight rise)
@@ -72,7 +72,7 @@ function CsprDot() {
   );
 }
 
-// Ascending mini bar chart (Ondo "Unique Holders" style) — pure divs.
+// Ascending mini bar chart — pure divs.
 function MiniBars({ values, color }: { values: number[]; color: string }) {
   if (!values.length) {
     return <div className="h-full w-full animate-pulse rounded-lg bg-bg-2" />;
@@ -250,7 +250,7 @@ export default function RwaSection() {
           <Reveal>
             <div className="rounded-3xl border border-line bg-bg-2/60 p-3 sm:p-4">
               <div className="grid gap-3 lg:grid-cols-3">
-                {/* left: product accordion (Ondo-style, one open at a time) */}
+                {/* left: product accordion (one open at a time) */}
                 <div className="flex flex-col gap-3">
                   {products.map((p) => {
                     const isOpen = product === p.key;

@@ -1,4 +1,4 @@
-"""Sawit Finance — AI Yield Router Agent / Settlement Keeper: monitors CPO prices and real SAWIT
+"""Sawit Finance — Rule-based Yield Router / Settlement Keeper (no LLM in the loop): monitors CPO prices and real SAWIT
 holder balances, creates+funds yield distribution epochs on Casper Testnet, then settles
 per-holder claimable amounts (idempotent) and detects expired unclaimed epochs.
 
@@ -768,7 +768,7 @@ async def run_cycle(session: aiohttp.ClientSession, state: dict) -> bool:
 
 async def main(once: bool = False):
     """Run the settlement keeper (continuously, unless once=True)."""
-    log.info("Sawit Finance AI Yield Router / Settlement Keeper starting...")
+    log.info("Sawit Finance Yield Router / Settlement Keeper (rule-based) starting...")
     log.info(f"Mode          : {TRIGGER_MODE}")
     log.info(f"Price trigger : ${PRICE_TRIGGER_CENTS/100:.2f}/ton CPO")
     log.info(f"Distribution  : {MONTHLY_DISTRIBUTION_CSPR:,} CSPR/epoch")

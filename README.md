@@ -55,7 +55,7 @@ TokenMinter ──CPI: mint()──> SawitToken (CEP-18)
 Revenue (CSPR) ──> YieldDistributor ──CSPR──> SAWIT holders
        ▲                  ▲
        │                  │
-AI Yield Router      AI Market Analyst
+Yield Router (rules) AI Market Analyst
 (triggers on price)  (reads chain → Gemini → autonomously tunes GORR on-chain)
 </pre>
 
