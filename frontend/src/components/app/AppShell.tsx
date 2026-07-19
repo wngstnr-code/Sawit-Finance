@@ -39,6 +39,7 @@ function TopNav() {
   const NAV = [
     { label: t.app.nav.explore, href: '/app' },
     { label: t.app.nav.portfolio, href: '/app/portfolio' },
+    { label: t.app.nav.agents, href: '/app/agents' },
   ];
   const TOOLS = [
     { label: t.app.nav.claimYield, href: '/app/tools/claim', desc: t.app.nav.claimYieldDesc },
