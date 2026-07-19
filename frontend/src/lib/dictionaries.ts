@@ -252,6 +252,7 @@ const en = {
       connected: 'Connected',
       disconnect: 'Disconnect',
       backToSite: 'Back to site',
+      snapshotBadge: 'Snapshot data — live chain read unavailable',
     },
     explore: {
       title: 'Explore',
@@ -288,6 +289,8 @@ const en = {
         'Send CSPR to the treasury — the allocation agent delivers SAWIT on-chain.',
       youSpend: 'You spend',
       estOut: '≈ {amount} SAWIT at the fixed treasury price',
+      estOutNote:
+        'Processed by the allocation agent — SAWIT arrives after on-chain confirmation, typically 1–2 minutes, not an instant swap.',
       verifyToBuy: 'Verify KYC to buy',
       provenance: 'Provenance',
       provenanceNote:
@@ -745,6 +748,7 @@ const id: LocaleDict = {
       connected: 'Terhubung',
       disconnect: 'Putuskan',
       backToSite: 'Kembali ke situs',
+      snapshotBadge: 'Data snapshot — pembacaan chain langsung tidak tersedia',
     },
     explore: {
       title: 'Jelajahi',
@@ -781,6 +785,8 @@ const id: LocaleDict = {
         'Kirim CSPR ke treasury — allocation agent mengantarkan SAWIT on-chain.',
       youSpend: 'Kamu keluarkan',
       estOut: '≈ {amount} SAWIT pada harga treasury tetap',
+      estOutNote:
+        'Diproses oleh allocation agent — SAWIT tiba setelah konfirmasi on-chain, biasanya 1–2 menit, bukan swap instan.',
       verifyToBuy: 'Verifikasi KYC untuk beli',
       provenance: 'Provenans',
       provenanceNote:

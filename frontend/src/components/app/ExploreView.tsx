@@ -239,6 +239,7 @@ export default function ExploreView() {
               <div className="mt-2 text-[12px] text-muted">
                 {t.app.explore.estOut.replace('{amount}', fmtAmount(estSawitOut ?? 0))}
               </div>
+              <div className="mt-1 text-[11px] text-faint">{t.app.explore.estOutNote}</div>
             </div>
 
             {/* testnet self-service: official Casper faucet */}

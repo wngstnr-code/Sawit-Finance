@@ -105,8 +105,9 @@ function TopNav() {
           </div>
         </nav>
 
-        {/* right — language + wallet */}
+        {/* right — snapshot badge + language + wallet */}
         <div className="flex items-stretch gap-2.5">
+          <SnapshotBadge />
           <LangToggle variant="footer" />
           <WalletMenu />
         </div>
@@ -130,6 +131,20 @@ function TopNav() {
         })}
       </nav>
     </header>
+  );
+}
+
+function SnapshotBadge() {
+  const { t } = useLocale();
+  const { isSnapshot } = useInvestor();
+  if (!isSnapshot) return null;
+  return (
+    <div
+      title={t.app.nav.snapshotBadge}
+      className="hidden items-center rounded-lg border border-line bg-bg-2 px-3 py-2.5 text-[11px] font-medium text-faint sm:flex"
+    >
+      {t.app.nav.snapshotBadge}
+    </div>
   );
 }
 

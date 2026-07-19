@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAccount } from '@/lib/useAccount';
-import { useChainState } from '@/lib/useChainState';
+import { useChainState, useChainStateMeta } from '@/lib/useChainState';
 import { useSawitBalance, accountHashFromPublicKey } from '@/lib/useSawitBalance';
 import { useFx } from '@/lib/useFx';
 import { useFairValue } from '@/lib/useFairValue';
@@ -43,6 +43,7 @@ type InvestorValue = {
   disconnect: () => void;
   // data
   state: ContractState | null;
+  isSnapshot: boolean;
   balance: number | null;
   claimable: number | null;
   kycVerified: boolean;
@@ -100,6 +101,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
   const tx = t.app.tx;
   const { clickRef, publicKey, connected, ready, connect, disconnect } = useAccount();
   const state = useChainState();
+  const { isSnapshot } = useChainStateMeta();
   const { balance, claimable, kycVerified, loading: balLoading, reload } = useSawitBalance(publicKey);
   const idr = useFx();
   const fairValueUsd = useFairValue();
@@ -140,9 +142,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
       setClaim({ phase: 'working', note: tx.sign });
       const tsx = buildClaimTransaction(publicKey, state.current_distribution_epoch);
       const json = tsx.toJSON();
-      console.log('[claim] epoch', state.current_distribution_epoch, 'tx.toJSON →', json);
       const res = await clickRef.send(json as unknown as object, publicKey);
-      console.log('[claim] send() result →', res);
       const r = res as { transactionHash?: string; deployHash?: string } | undefined;
       const hash = r?.transactionHash || r?.deployHash;
       if (hash) {
@@ -168,9 +168,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
         setBuy({ phase: 'working', note: tx.sign });
         const tsx = buildBuyTransferTransaction(publicKey, csprAmount);
         const json = tsx.toJSON();
-        console.log('[buy] amount', csprAmount, 'tx.toJSON →', json);
         const res = await clickRef.send(json as unknown as object, publicKey);
-        console.log('[buy] send() result →', res);
         const r = res as { transactionHash?: string; deployHash?: string } | undefined;
         const hash = r?.transactionHash || r?.deployHash;
         if (hash) {
@@ -200,6 +198,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
     connect,
     disconnect,
     state,
+    isSnapshot,
     balance,
     claimable,
     kycVerified,

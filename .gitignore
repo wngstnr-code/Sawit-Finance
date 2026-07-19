@@ -45,3 +45,10 @@ TANUR-PARITY.md
 TANUR-UI-PLAN.md
 
 graphify-out/
+
+# Agent runtime state (local, per-machine)
+agents/.allocation_state.json
+agents/.allocation_state.lock
+agents/.yield_state.json
+agents/.market_state.json
+agents/.oracle_provenance.json
