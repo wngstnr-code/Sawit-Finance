@@ -19,6 +19,7 @@ secret_key*
 *.tmp
 *.log
 *.notes.md
+pr_final.md
 
 .venv/
 __pycache__/
@@ -38,3 +39,9 @@ frontend/out/
 .auto-memory/
 .agents/
 skills-lock.json
+
+# Internal planning notes (not for submission repo)
+TANUR-PARITY.md
+TANUR-UI-PLAN.md
+
+graphify-out/

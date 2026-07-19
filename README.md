@@ -122,6 +122,8 @@ This is a **data-source** limitation, not an architectural one. The pipeline is 
 
 **x402 micropayments — official protocol, live on-chain settlement.** Agents pay per-request for gated CPO data over the **official Casper x402 protocol** (`agents/x402-official/`, built on [`@make-software/casper-x402`](https://github.com/make-software/casper-x402) — the same stack behind the hosted CSPR.cloud Facilitator): the agent receives `402` + PaymentRequirements, signs an **EIP-712 transfer authorization**, and the facilitator settles it via the CEP-18 `transfer_with_authorization` entry point — **gasless for the agent**, spec-interoperable with any x402 client. Payments are made in **SAWITX**, our own CEP-18 x402 token deployed for this ([`ace00b4d…`](https://testnet.cspr.live/contract-package/ace00b4d5e5e1fb52be4260e0aba9cbf2595992eb599519d6b596b9ff0ea1f2b)). Live settlement: [`1ea0a5f2…`](https://testnet.cspr.live/deploy/1ea0a5f2c4a03a282055ecb9e826108bb4ad3d04e8e5530d9baf856f27e490f3) — 402 → EIP-712 → on-chain in ~15s. This isn't a standalone demo: the **Oracle Agent pays for its KPBN/MPOB data through this path** in its pipeline (`fetch_via_x402_official` → the `paid-fetch.ts` bridge, the same subprocess-bridge pattern as `read_state`), falling back to the reference client if the official rail is down.
 
+**Key separation.** The x402 facilitator loads its signing key from `X402_SECRET_KEY_PATH`, kept separate from the contract-authority key — `ODRA_CASPER_LIVENET_SECRET_KEY_PATH` remains only a fallback for local demo, never the facilitator's live key. Settlement is capped at **7 CSPR per payment** (`limitedPaymentMotes`) and rate-limited (30 req/min). Multi-sig operator remains a Phase-3 [roadmap](#launch-plan) item.
+
 **Why there's also a from-scratch implementation.** Before integrating the official rails, we implemented the full x402 handshake ourselves (`agents/x402.py` — ed25519 proofs, amount/recipient/resource/nonce binding, replay protection, self-tests) with live native-CSPR settlement ([`8b25fb9e…`](https://testnet.cspr.live/deploy/8b25fb9e548b2f3cf639f5ca65e5c54581223f43bb3a647730b0d6fffb074856)). It stays in the repo as a **reference implementation**: proof we understand the protocol down to the bytes we sign, not just the SDK surface. Production traffic goes through the official protocol path.
 
 **Casper MCP Server.** `agents/mcp_server.py` exposes the protocol's live on-chain state to any MCP-compatible LLM (Claude, etc.) as standardized tools — the Casper AI Toolkit pattern. An LLM can query SAWIT supply, oracle reputation, a holder's position, and the live palm oil price through tool calls instead of bespoke API glue.
@@ -185,13 +187,15 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 | On-chain reads | `read_state` / `read_balance` Odra livenet bridges (reads Odra's internal state CSPR.cloud can't) |
 | Frontend | Next.js 14 + CSPR.click wallet + casper-js-sdk (landing + investor dashboard, live claims) |
 
+**App freshness.** Portfolio now shows the connected wallet's **real on-chain activity**: the app merges its local action log with the wallet's full deploy history, fetched server-side from CSPR.cloud via `/api/activity` (the CSPR.cloud API key stays server-side, never shipped to the client). The provenance/epoch table now includes distribution-only epochs too (e.g. the epoch-3 re-fund) — `read_state` iterates distribution epochs with the production record treated as optional. The **"CSPR distributed"** metric is the sum of funded epochs' distribution pools (the contract's all-time counter only advances on sweep) — currently **160 CSPR across 3 funded epochs**. On the landing page, the On-chain Proof section is now a vertical ledger with all five tx proofs always visible.
+
 ---
 
 ## Run It Yourself
 
 ```bash
 # 1. Contracts — run all tests incl. the full e2e pipeline (no node needed)
-cargo +nightly-2026-01-01 test            # 15 tests, incl. record→mint→KYC→claim
+cargo +nightly-2026-01-01 test            # 18 tests, incl. record→mint→KYC→claim
 
 # 2. Agents
 python3 -m venv .venv && ./.venv/bin/pip install -r agents/requirements.txt
@@ -234,6 +238,30 @@ Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[s
 
 ---
 
+## Live protocol operations — a real incident, fixed with a live upgrade
+
+Autonomy is only as good as what happens when something goes wrong on a live deployment. During finals prep we found exactly that: distribution epoch 1 had **125 CSPR claimed against a 100 CSPR funded pool** — a real economic bug on our own testnet contracts, not a hypothetical. Root cause: `set_claimable` had no on-chain cap on the sum of allocations per epoch, so claimables could be set past what the pool actually held.
+
+The fix shipped as a **live, in-place package upgrade** — the contracts have been deployed upgradable since day one, so this was a deploy, not a migration or a redeploy-and-migrate-state exercise. `set_claimable` / `set_claimable_batch` now track a running per-epoch allocation sum and **revert with `ClaimableExceedsPool`** the moment an allocation would exceed the funded pool; `sweep_unclaimed` uses checked subtraction so the historical over-claimed epoch stays safely sweepable instead of underflowing.
+
+- **Upgrade tx** (same package hash `1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9`, state fully retained across the upgrade): [`7757f5ed…`](https://testnet.cspr.live/transaction/7757f5ed1c904744256e701b0ec63fdc0f9f8efe6c52d4ca365098710a85123b)
+- **Guard verified live:** an intentional 31-CSPR allocation against a 30-CSPR pool was rejected on-chain — `User error: 13` — [`20be11c9…`](https://testnet.cspr.live/transaction/20be11c94614482435f94407eefd5127a6a7309435b93b996dba93c97978e7b9)
+- Distributor purse solvency was restored with a payable top-up through `fund_epoch` (25 CSPR).
+
+This is the protocol lifecycle working as designed — **monitor → diagnose on-chain → patch → upgrade in place → verify with a real revert.** Casper's upgradable packages made the fix a deploy, not a migration.
+
+### Operator tooling
+
+The repo ships read-only and operational bins for exactly this kind of live operation, alongside the existing `read_state` / `read_balance` bridges:
+
+- `inspect_epoch` — dumps any distribution epoch, its claimables, and the new running `claimable_total`
+- `topup` — a payable purse top-up via `fund_epoch` (requires explicit `TOPUP_EPOCH` / `TOPUP_AMOUNT_MOTES`, no silent defaults)
+- `upgrade_dist` — the in-place package upgrade path used above
+
+`set_claimable` itself now **requires an explicit `CLAIM_AMOUNT_MOTES`** — the old silent 25-CSPR default is gone; it was the root cause of the over-allocation in the first place.
+
+---
+
 ## Launch Plan
 
 **Shipped today (Qualification Round, July 2026)** — the full economic loop live on Casper Testnet: 4 upgradable contracts, 3 autonomous agents writing on-chain, official-protocol x402 settlement, MCP server, and a working investor app at [sawitfinance.xyz](https://sawitfinance.xyz).
@@ -254,13 +282,13 @@ Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[s
 
 | Criterion | Implementation |
 |-----------|---------------|
-| Technical Execution | 4 Odra contracts, 15 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
+| Technical Execution | 4 Odra contracts, 18 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
 | Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
-| Working Contracts | 15 tests green; upgradable, deployed + executed on Casper Testnet |
+| Working Contracts | 18 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
 | Long-Term Launch Plans | Milestone-gated [Launch Plan](#launch-plan) — security review → mainnet → real mill data → decentralized trust; active socials |
 
 ---
