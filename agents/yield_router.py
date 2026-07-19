@@ -783,7 +783,15 @@ async def main(once: bool = False):
     async with aiohttp.ClientSession() as session:
         if once:
             log.info(f"[ROUTER] Checking trigger conditions (--once)...")
-            await run_cycle(session, state)
+            try:
+                await run_cycle(session, state)
+            except Exception as e:
+                # A single-cycle CI run should surface problems (insufficient operator
+                # purse — submit_distribution already returns empty for that —, a
+                # ClaimableExceedsPool revert, or transient RPC) without hard-failing the
+                # scheduled workflow. Whatever state was produced is still saved and
+                # committed by the caller.
+                log.error(f"[ROUTER] --once cycle error (non-fatal): {e}", exc_info=True)
             return
 
         while True:

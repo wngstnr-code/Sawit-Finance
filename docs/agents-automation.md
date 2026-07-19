@@ -38,21 +38,31 @@ The workflow materializes the pem to `~/.casper-keys/secret_key.pem` and overrid
 > testnet contract state. Never do this with a mainnet key; the Phase-1 multi-sig operator
 > in the launch plan is what replaces this for production.
 
-## Triggers
+## Triggers — orchestrated cadence
 
-- **Scheduled** (`cron: 17 6 * * *`, daily): runs the **Market Analyst** with
-  `AUTONOMY_MODE=on` and **no** demo forcing. It acts on-chain **only** when Gemini
-  recommends a different GORR *and* the 24h cooldown has elapsed — otherwise it's a no-op
-  and nothing is committed. This is honest, rail-protected autonomy.
-- **Manual** (`workflow_dispatch`): pick the agent (`market-analyst` / `oracle` / `both`).
-  `demo=true` (default) forces **one guaranteed on-chain GORR change** — it bypasses the
-  cooldown and report-only gate and nudges GORR one clamp-step within
-  `[MIN_GORR_BPS, MAX_GORR_BPS]` — so a manual run **always** produces a fresh, clickable
-  tx. Use this right before recording.
+Each agent runs at the frequency that matches its economic meaning, not all daily. The
+three cron entries are differentiated in the workflow by `github.event.schedule`:
 
-Oracle is left off the daily schedule on purpose: each oracle cycle records a **new
-epoch**, so running it daily would inflate epochs. Trigger it manually when you actually
-want a new production epoch.
+| Schedule | Agent(s) | Why this cadence |
+|----------|----------|------------------|
+| `17 6 * * *` (daily) | **Market Analyst** | GORR risk-tuning is naturally frequent; acts on-chain only when Gemini recommends a change *and* the 24h cooldown elapsed — otherwise a no-op (no commit). |
+| `37 6 * * *` (daily) | **Allocation** | Screens/settles new SAWIT-buy deposits to the treasury as they arrive. |
+| `0 6 1 * *` (monthly, 1st) | **Oracle → Yield Router** | The real production→distribution cycle: record the month's production epoch, then fund + set_claimable so yield becomes claimable. One clean epoch/month — no inflation. |
+
+**Manual** (`workflow_dispatch`): pick any agent —
+`market-analyst` / `oracle` / `yield-router` / `allocation` / `oracle-then-yield` / `all`.
+`demo=true` (default) forces **one guaranteed on-chain GORR change** (Market Analyst) —
+bypassing the cooldown and report-only gate, nudging GORR one clamp-step within
+`[MIN_GORR_BPS, MAX_GORR_BPS]` — so a manual run **always** produces a fresh, clickable tx.
+Use this right before recording.
+
+**Costs & safety:** the monthly oracle→yield run records a new production epoch and funds a
+distribution epoch with real testnet CSPR from the operator purse
+(`MONTHLY_DISTRIBUTION_CSPR`). If the purse is short, `submit_distribution` logs and returns
+empty (no crash); the yield_router `--once` path is wrapped so a `ClaimableExceedsPool`
+revert or transient RPC error is non-fatal to the workflow. All contract-level guards
+(tons cap, cooldown, clamp, `ClaimableExceedsPool`) stay enforced — automation never
+bypasses them.
 
 ## Recording the demo against the live site
 
