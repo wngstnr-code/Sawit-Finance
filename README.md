@@ -137,6 +137,8 @@ This is a **data-source** limitation, not an architectural one. The pipeline is 
 | `get_contracts` / `get_economic_loop` | deployed hashes + executed-loop tx (cspr.live links) |
 | `refresh_protocol_state` | force a fresh live read of all four contracts |
 
+See **[docs/mcp-evidence.md](docs/mcp-evidence.md)** for a captured Claude Desktop session invoking these tools live over MCP (config + reproduction steps included).
+
 ---
 
 ## On-Chain Oracle Reputation
@@ -264,7 +266,7 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 - `inspect_epoch` — dumps any distribution epoch, its claimables, and the new running `claimable_total`
 - `topup` — a payable purse top-up via `fund_epoch` (requires explicit `TOPUP_EPOCH` / `TOPUP_AMOUNT_MOTES`, no silent defaults)
-- `upgrade_dist` — the in-place package upgrade path used above
+- `upgrade_dist` / `upgrade_vault` — the in-place package upgrade paths (distributor and vault)
 
 `set_claimable` itself now **requires an explicit `CLAIM_AMOUNT_MOTES`** — the old silent 25-CSPR default is gone; it was the root cause of the over-allocation in the first place.
 
