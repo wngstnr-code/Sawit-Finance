@@ -11,7 +11,7 @@ const { KeyAlgorithm } = casperSdk;
 const url = `http://localhost:${env.serverPort}/api/kpbn/price`;
 
 async function main(): Promise<void> {
-  console.log("SAWIT.FI agent — paid CPO data fetch via official x402 protocol");
+  console.log("Sawit Finance agent — paid CPO data fetch via official x402 protocol");
   console.log("=".repeat(64));
 
   const signer = await createClientCasperSigner(env.secretKeyPath, KeyAlgorithm.ED25519);
