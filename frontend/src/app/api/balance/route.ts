@@ -7,18 +7,22 @@ import { readAccountState } from '@/lib/casperState';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
 
-type Bal = { balance: number; claimable_motes: string; kyc_verified: boolean };
+type Bal = { balance: number; liquid_motes: string; claimable_motes: string; already_claimed: boolean; kyc_verified: boolean };
 
 const BALANCE_SNAPSHOT: Record<string, Bal> = {
   e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe: {
     balance: 100,
-    claimable_motes: '25000000000',
-    kyc_verified: false,
+    liquid_motes: '0',
+    claimable_motes: '0',
+    already_claimed: false,
+    kyc_verified: true,
   },
   '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec': {
-    balance: 2_259_900,
+    balance: 2_259_880,
+    liquid_motes: '0',
     claimable_motes: '0',
-    kyc_verified: false,
+    already_claimed: false,
+    kyc_verified: true,
   },
 };
 
@@ -64,7 +68,9 @@ function runBridge(accountHashHex: string): Promise<Bal> {
         const j = JSON.parse(line.slice('SAWIT_BALANCE_JSON '.length));
         resolve({
           balance: Number(j.balance),
+          liquid_motes: String(j.liquid_motes ?? '0'),
           claimable_motes: String(j.claimable_motes ?? '0'),
+          already_claimed: Boolean(j.already_claimed ?? false),
           kyc_verified: Boolean(j.kyc_verified ?? false),
         });
       } catch (e) {
@@ -104,7 +110,9 @@ export async function GET(req: Request) {
   } catch {
     const snap = BALANCE_SNAPSHOT[account] ?? {
       balance: 0,
+      liquid_motes: '0',
       claimable_motes: '0',
+      already_claimed: false,
       kyc_verified: false,
     };
     return NextResponse.json({ ...snap, snapshot: true });

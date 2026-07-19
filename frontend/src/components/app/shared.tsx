@@ -8,7 +8,7 @@ import { AreaChart, type ChartPoint } from '@/components/ui/ChartArea';
 import { CONTRACTS } from '@/lib/config';
 import { LOOP_STEPS, txUrl, pkgUrl } from '@/lib/onchain';
 import { fmtAmount, fmtUsdFromCents, fmtIdr, bpsToPct, shortHash, fromBaseUnits } from '@/lib/format';
-import { CSPR_DECIMALS } from '@/lib/config';
+import { CSPR_DECIMALS, SAWIT_DECIMALS, SALE } from '@/lib/config';
 import { CountUp } from '@/components/motion/CountUp';
 import { useLocale } from '@/lib/i18n';
 import { useInvestor, type Phase } from './investor';
@@ -495,25 +495,51 @@ export function KycBanner() {
 
 export function HoldingsList({ showApy = true }: { showApy?: boolean }) {
   const { t } = useLocale();
-  const { balance, claimable, idr, fairValueUsd } = useInvestor();
+  const { balance, liquid, claimable, idr, fairValueUsd, csprUsd, state, distributed } = useInvestor();
+
+  // Distribution yield to date per *circulating* SAWIT, as a % of the fixed
+  // treasury price — identical denominator/proxy to ExploreView & the landing.
+  const circulating = state?.circulating_sawit
+    ? fromBaseUnits(state.circulating_sawit, SAWIT_DECIMALS)
+    : 0;
+  const yieldBase = circulating > 0 ? circulating : (state ? Number(state.total_sawit_supply) : 0);
+  const sawitYieldPct =
+    yieldBase > 0 && distributed > 0
+      ? `~${((distributed / yieldBase / SALE.priceCspr) * 100).toFixed(1)}%`
+      : null;
 
   const rows = [
     {
       code: 'SAWIT',
       name: t.app.shared.assetSawit,
-      apy: null as string | null,
+      apy: sawitYieldPct,
       balance: balance ?? 0,
       valueUsd: fairValueUsd != null && balance != null ? balance * fairValueUsd : null,
       unauthorized: false,
     },
     {
+      // Native CSPR the connected wallet actually holds (liquid, live on-chain),
+      // marked in USD at the live CoinGecko spot price.
       code: 'CSPR',
-      name: t.app.shared.assetYield,
+      name: t.app.shared.assetCspr,
       apy: null as string | null,
-      balance: claimable ?? 0,
-      valueUsd: null as number | null, // no direct USD mark for claimable CSPR
+      balance: liquid ?? 0,
+      valueUsd: liquid != null ? liquid * csprUsd : null,
       unauthorized: false,
     },
+    // Claimable revenue yield — only listed once there is something to claim.
+    ...(claimable && claimable > 0
+      ? [
+          {
+            code: 'YIELD',
+            name: t.app.shared.assetYield,
+            apy: null as string | null,
+            balance: claimable,
+            valueUsd: claimable * csprUsd,
+            unauthorized: false,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -526,7 +552,7 @@ export function HoldingsList({ showApy = true }: { showApy?: boolean }) {
         <div className="text-right">{t.app.shared.value}</div>
       </div>
 
-      {balance == null && claimable == null ? (
+      {balance == null && liquid == null ? (
         <div className="px-6 py-8 text-center text-[13px] text-muted">{t.app.shared.loadingHoldings}</div>
       ) : (
         rows.map((r) => (
@@ -558,7 +584,7 @@ export function HoldingsList({ showApy = true }: { showApy?: boolean }) {
               </div>
             )}
             <div className="text-right tabular-nums text-ink">
-              {fmtAmount(r.balance, r.code === 'CSPR' ? 4 : 0)}
+              {fmtAmount(r.balance, r.code === 'SAWIT' ? 0 : 4)}
               <div className="text-[11px] text-faint sm:hidden">{r.code}</div>
             </div>
             <div className="text-right tabular-nums text-ink">

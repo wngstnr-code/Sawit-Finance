@@ -26,9 +26,12 @@ export const CSPR_DECIMALS = 9;
 export const ISSUER_ACCOUNT_HASH =
   '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec';
 
+// Sale treasury = the deployer/authority account (buy transfers target this
+// public key, so the account hash MUST be its derivation — it was previously
+// mismatched against a demo-holder account, which stranded buy deposits).
 export const TREASURY = {
   publicKey: '016410a22de86e0de234120f29272d5b1096caa60b3cf8a3b396d49e5399ad5428',
-  accountHash: 'e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe',
+  accountHash: '57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec',
 } as const;
 
 export const SALE = {

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 export type DonutSegment = {
@@ -23,6 +23,7 @@ export function DonutChart({
   className?: string;
 }) {
   const reduceMotion = useReducedMotion();
+  const [hover, setHover] = useState<number | null>(null);
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((sum, s) => sum + Math.max(0, s.value), 0);
@@ -35,8 +36,10 @@ export function DonutChart({
       const dash = fraction * circumference;
       const offset = circumference - cumulative * circumference;
       cumulative += fraction;
-      return { ...s, dash, offset };
+      return { ...s, fraction, dash, offset };
     });
+
+  const active = hover != null ? arcs[hover] : null;
 
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
@@ -58,22 +61,37 @@ export function DonutChart({
               r={radius}
               fill="none"
               stroke={a.color}
-              strokeWidth={thickness}
+              // On hover the active slice keeps full opacity and thickens a
+              // touch; the others dim so the focused share reads clearly.
+              strokeWidth={hover === i ? thickness + 4 : thickness}
               strokeLinecap="butt"
               strokeDasharray={`${a.dash} ${circumference - a.dash}`}
               strokeDashoffset={a.offset}
               initial={reduceMotion ? { opacity: 1 } : { opacity: 0, strokeDasharray: `0 ${circumference}` }}
-              animate={{ opacity: 1, strokeDasharray: `${a.dash} ${circumference - a.dash}` }}
-              transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              animate={{
+                opacity: hover != null && hover !== i ? 0.3 : 1,
+                strokeDasharray: `${a.dash} ${circumference - a.dash}`,
+              }}
+              transition={{ duration: reduceMotion ? 0 : 0.35, delay: hover != null ? 0 : i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              style={{ cursor: 'pointer' }}
             />
           ))
         ) : null}
       </svg>
-      {children && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          {children}
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+        {active ? (
+          <>
+            <div className="font-display text-xl font-semibold tabular-nums text-ink">
+              {(active.fraction * 100).toFixed(1)}%
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.1em] text-faint">{active.label}</div>
+          </>
+        ) : (
+          children
+        )}
+      </div>
     </div>
   );
 }

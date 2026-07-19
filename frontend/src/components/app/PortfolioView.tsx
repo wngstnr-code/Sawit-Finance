@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/primitives';
 import Button from '@/components/ui/Button';
-import { DonutChart, DonutLegend } from '@/components/ui/DonutChart';
+import { DonutChart } from '@/components/ui/DonutChart';
 import { CountUp } from '@/components/motion/CountUp';
 import { fmtAmount, fromBaseUnits, shortHash } from '@/lib/format';
 import { accountHashFromPublicKey } from '@/lib/useSawitBalance';
@@ -75,23 +75,50 @@ function formatRelative(at: number, t: ReturnType<typeof useLocale>['t']): strin
 
 export default function PortfolioView() {
   const { t } = useLocale();
-  const { publicKey, connected, balance, claimable, fairValueUsd, idr, share, supply, state, cpoHistory } =
+  const { publicKey, connected, balance, liquid, claimable, fairValueUsd, csprUsd, idr, share, supply, state, cpoHistory } =
     useInvestor();
   const activity = useActivity(publicKey ?? null);
 
   const sawitBalance = fromBaseUnits(String(balance ?? 0), SAWIT_DECIMALS);
+  const liquidCspr = liquid ?? 0;
   const claimableCspr = claimable ?? 0;
   const sawitValueCspr = sawitBalance * SALE.priceCspr;
-  const totalValueCspr = sawitValueCspr + claimableCspr;
-  const sawitUsdValue = fairValueUsd != null ? sawitBalance * fairValueUsd : null;
+  // Portfolio = everything the connected wallet holds, marked in CSPR: SAWIT at
+  // treasury price + liquid CSPR at par + claimable yield at par.
+  const totalValueCspr = sawitValueCspr + liquidCspr + claimableCspr;
+  // USD marker: SAWIT at its fair value + CSPR (liquid + claimable) at the live
+  // CoinGecko spot — the same basis the Casper Wallet uses.
+  const totalUsd = (fairValueUsd != null ? sawitBalance * fairValueUsd : 0) + (liquidCspr + claimableCspr) * csprUsd;
 
+  // Donut arcs (CSPR value); DonutChart drops zero segments automatically.
   const segments = useMemo(
     () => [
       { label: 'SAWIT', value: sawitValueCspr, color: '#1E7A4F' },
-      { label: 'CSPR', value: claimableCspr, color: '#9A9CA4' },
+      { label: 'CSPR', value: liquidCspr, color: '#FF473E' },
+      { label: 'Yield', value: claimableCspr, color: '#C6803A' },
     ],
-    [sawitValueCspr, claimableCspr]
+    [sawitValueCspr, liquidCspr, claimableCspr]
   );
+
+  // Legend rows carry the real token counts so "1,000" (a CSPR value) is never
+  // mistaken for a token quantity.
+  const legendRows = [
+    {
+      label: 'SAWIT',
+      color: '#1E7A4F',
+      amount: `${fmtAmount(sawitBalance, 0)} ${t.app.shared.tokenUnit}`,
+      valueCspr: sawitValueCspr,
+    },
+    {
+      label: 'CSPR',
+      color: '#FF473E',
+      amount: t.app.portfolio.liquidWallet,
+      valueCspr: liquidCspr,
+    },
+    ...(claimableCspr > 0
+      ? [{ label: t.app.portfolio.claimableYield, color: '#C6803A', amount: t.app.portfolio.readyToClaim, valueCspr: claimableCspr }]
+      : []),
+  ];
 
   // Portfolio value over time, per the chart footer: current SAWIT holdings marked
   // at each point's fair value (CPO price × 10 000 / (token_rate × gorr_bps)),
@@ -99,11 +126,12 @@ export default function PortfolioView() {
   const portfolioSeries = useMemo(() => {
     if (!state?.token_rate || !state?.gorr_bps || !cpoHistory || sawitBalance <= 0) return undefined;
     const denom = state.token_rate * state.gorr_bps;
+    const parCspr = liquidCspr + claimableCspr;
     return cpoHistory.series.map((p) => ({
       date: p.date,
-      price: sawitBalance * ((p.price * 10_000) / denom) + claimableCspr,
+      price: sawitBalance * ((p.price * 10_000) / denom) + parCspr,
     }));
-  }, [state, cpoHistory, sawitBalance, claimableCspr]);
+  }, [state, cpoHistory, sawitBalance, liquidCspr, claimableCspr]);
 
   if (!connected) {
     return (
@@ -127,13 +155,9 @@ export default function PortfolioView() {
       <BalanceHero
         label={t.app.portfolio.value}
         value={<CountUp to={totalValueCspr} format={(v) => `${fmtAmount(v, 2)} CSPR`} />}
-        sub={
-          sawitUsdValue != null
-            ? `≈ $${fmtAmount(sawitUsdValue, 2)} (Rp ${(sawitUsdValue * idr).toLocaleString('id-ID', {
-                maximumFractionDigits: 0,
-              })}) · ${shareStr}`
-            : shareStr
-        }
+        sub={`≈ $${fmtAmount(totalUsd, 2)} (Rp ${(totalUsd * idr).toLocaleString('id-ID', {
+          maximumFractionDigits: 0,
+        })}) · ${shareStr}`}
       />
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
@@ -168,9 +192,21 @@ export default function PortfolioView() {
                   <div className="text-[10px] uppercase tracking-[0.1em] text-faint">CSPR</div>
                 </DonutChart>
               </div>
-              <div className="mt-4">
-                <DonutLegend segments={segments} />
-              </div>
+              <ul className="mt-4 space-y-2.5">
+                {legendRows.map((r) => (
+                  <li key={r.label} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-[13px] text-muted">
+                      <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: r.color }} />
+                      <span className="font-medium text-ink">{r.label}</span>
+                      <span className="text-faint">· {r.amount}</span>
+                    </span>
+                    <span className="font-mono text-[13px] tabular-nums text-ink">
+                      {fmtAmount(r.valueCspr, 2)}
+                      <span className="ml-1 text-[10px] text-faint">CSPR</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
         </Card>

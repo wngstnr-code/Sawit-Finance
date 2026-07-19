@@ -15,12 +15,17 @@ export default function StandardSection() {
   const s = useChainState();
   const cpoValueUsd = s ? (s.total_tons_cpo * s.latest_cpo_price_cents) / 100 : 0;
 
-  // Distribution yield: total CSPR distributed to date per SAWIT, expressed as
-  // a percentage of the fixed treasury price — same proxy used in ExploreView.
+  // Distribution yield: total CSPR distributed to date per *circulating* SAWIT
+  // (issuer float and sale treasury excluded — yield accrues to holders, not to
+  // unsold inventory), as a percentage of the fixed treasury price. Same proxy
+  // and denominator as ExploreView/RwaSection; falls back to total supply when
+  // the snapshot predates the circulating_sawit field.
   const supply = s ? fromBaseUnits(s.total_sawit_supply, SAWIT_DECIMALS) : 0;
+  const circulating = s?.circulating_sawit ? fromBaseUnits(s.circulating_sawit, SAWIT_DECIMALS) : 0;
+  const yieldBase = circulating > 0 ? circulating : supply;
   const distributed = distributedCspr(s, CSPR_DECIMALS);
   const distYieldPct =
-    s && supply > 0 && distributed > 0 ? (distributed / supply / SALE.priceCspr) * 100 : null;
+    s && yieldBase > 0 && distributed > 0 ? (distributed / yieldBase / SALE.priceCspr) * 100 : null;
 
   return (
     <Section className="py-24 text-center sm:py-32">

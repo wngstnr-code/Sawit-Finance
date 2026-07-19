@@ -13,6 +13,7 @@ import { useChainState, useChainStateMeta } from '@/lib/useChainState';
 import { useSawitBalance, accountHashFromPublicKey } from '@/lib/useSawitBalance';
 import { useFx } from '@/lib/useFx';
 import { useFairValue } from '@/lib/useFairValue';
+import { useCsprUsd } from '@/lib/useCsprUsd';
 import { useCpoHistory } from '@/lib/useCpoHistory';
 import { buildClaimTransaction } from '@/lib/claim';
 import { buildBuyTransferTransaction } from '@/lib/buy';
@@ -45,12 +46,15 @@ type InvestorValue = {
   state: ContractState | null;
   isSnapshot: boolean;
   balance: number | null;
+  liquid: number | null;
   claimable: number | null;
+  alreadyClaimed: boolean;
   kycVerified: boolean;
   balLoading: boolean;
   reload: (fresh?: boolean) => void;
   idr: number;
   fairValueUsd: number | null;
+  csprUsd: number;
   cpoHistory: ReturnType<typeof useCpoHistory>;
   // derived
   supply: number;
@@ -102,9 +106,10 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
   const { clickRef, publicKey, connected, ready, connect, disconnect } = useAccount();
   const state = useChainState();
   const { isSnapshot } = useChainStateMeta();
-  const { balance, claimable, kycVerified, loading: balLoading, reload } = useSawitBalance(publicKey);
+  const { balance, liquid, claimable, alreadyClaimed, kycVerified, loading: balLoading, reload } = useSawitBalance(publicKey);
   const idr = useFx();
   const fairValueUsd = useFairValue();
+  const csprUsd = useCsprUsd();
   const cpoHistory = useCpoHistory();
   const derived = useDerived(state, balance, claimable);
 
@@ -201,12 +206,15 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
     state,
     isSnapshot,
     balance,
+    liquid,
     claimable,
+    alreadyClaimed,
     kycVerified,
     balLoading,
     reload,
     idr,
     fairValueUsd,
+    csprUsd,
     cpoHistory,
     ...derived,
     claim,

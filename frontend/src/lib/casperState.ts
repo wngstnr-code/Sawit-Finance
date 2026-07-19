@@ -1,4 +1,4 @@
-import { NETWORK, CONTRACTS, ISSUER_ACCOUNT_HASH, TREASURY } from './config';
+import { NETWORK, CONTRACTS, ISSUER_ACCOUNT_HASH } from './config';
 import type { ContractStateWithEpochs, EpochEntry } from './stateSnapshot';
 
 /**
@@ -263,16 +263,13 @@ export async function readChainState(): Promise<ContractStateWithEpochs> {
     });
   }
 
-  // Circulating supply = total minus the issuer float and the sale treasury —
-  // the honest denominator for distribution-yield math.
-  const [issuerBalB, treasuryBalB] = await Promise.all([
-    readRaw(srh, token, TOKEN.balances, accountKey(ISSUER_ACCOUNT_HASH)),
-    readRaw(srh, token, TOKEN.balances, accountKey(TREASURY.accountHash)),
-  ]);
+  // Circulating supply = total minus the issuer/treasury float (one account:
+  // the deployer holds both the unsold inventory and the sale proceeds) — the
+  // honest denominator for distribution-yield math. Every other holder,
+  // including demo/investor accounts, counts as circulating.
+  const issuerBalB = await readRaw(srh, token, TOKEN.balances, accountKey(ISSUER_ACCOUNT_HASH));
   const issuerBal = issuerBalB ? new R(issuerBalB).big() : 0n;
-  const treasuryBal = treasuryBalB ? new R(treasuryBalB).big() : 0n;
-  const nonCirculating = issuerBal + treasuryBal;
-  const circulating = totalSupply > nonCirculating ? totalSupply - nonCirculating : 0n;
+  const circulating = totalSupply > issuerBal ? totalSupply - issuerBal : 0n;
 
   const cur = epochs.find((e) => e.epoch_number === Number(curEpoch));
   return {
@@ -300,7 +297,29 @@ export async function readChainState(): Promise<ContractStateWithEpochs> {
 // bytesrepr of an Address (tag 0 = account) — mapping key for balances/kyc/claimable.
 const accountKey = (accountHashHex: string) => Buffer.concat([Buffer.from([0]), Buffer.from(accountHashHex, 'hex')]);
 
-export async function readAccountState(accountHashHex: string): Promise<{ balance: number; claimable_motes: string; kyc_verified: boolean }> {
+// Native CSPR (liquid) balance of an account's main purse, in motes. Two hops:
+// account-hash → main_purse uref, then the uref's motes. Returns '0' if the
+// account has never been funded on-chain (no Account record yet).
+export async function readLiquidMotes(srh: string, accountHashHex: string): Promise<string> {
+  try {
+    const acc = await rpc<{ stored_value: { Account?: { main_purse: string } } }>('query_global_state', {
+      state_identifier: null,
+      key: `account-hash-${accountHashHex}`,
+      path: [],
+    });
+    const purse = acc.stored_value.Account?.main_purse;
+    if (!purse) return '0';
+    const bal = await rpc<{ balance_value: string }>('state_get_balance', {
+      state_root_hash: srh,
+      purse_uref: purse,
+    });
+    return bal.balance_value ?? '0';
+  } catch {
+    return '0';
+  }
+}
+
+export async function readAccountState(accountHashHex: string): Promise<{ balance: number; liquid_motes: string; claimable_motes: string; already_claimed: boolean; kyc_verified: boolean }> {
   const srh = await stateRootHash();
   const [vault, token, dist] = await Promise.all([
     contractHash(CONTRACTS.productionVault),
@@ -310,18 +329,21 @@ export async function readAccountState(accountHashHex: string): Promise<{ balanc
   const ck = accountKey(accountHashHex);
   const curB = await readRaw(srh, dist, DIST.current_epoch);
   const cur = curB ? new R(curB).u64() : 0n;
-  const [balB, kycB, clB, cdB] = await Promise.all([
+  const [balB, kycB, clB, cdB, liquid] = await Promise.all([
     readRaw(srh, token, TOKEN.balances, ck),
     readRaw(srh, vault, VAULT.kyc, ck),
     readRaw(srh, dist, DIST.claimable, Buffer.concat([u64Key(cur), ck])),
     readRaw(srh, dist, DIST.claimed, Buffer.concat([u64Key(cur), ck])),
+    readLiquidMotes(srh, accountHashHex),
   ]);
   // The contract keeps `claimable` as a historical record and marks `claimed`
   // separately — a claimed epoch must read as nothing-left-to-claim here.
   const alreadyClaimed = cdB ? new R(cdB).bool() : false;
   return {
     balance: balB ? Number(new R(balB).big()) : 0,
+    liquid_motes: liquid,
     claimable_motes: alreadyClaimed || !clB ? '0' : new R(clB).big().toString(),
+    already_claimed: alreadyClaimed,
     kyc_verified: kycB ? new R(kycB).bool() : false,
   };
 }

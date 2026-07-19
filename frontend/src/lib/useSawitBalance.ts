@@ -12,8 +12,9 @@ export function accountHashFromPublicKey(publicKey: string): string {
 
 export function useSawitBalance(publicKey?: string) {
   const [balance, setBalance] = useState<number | null>(null);
-
+  const [liquid, setLiquid] = useState<number | null>(null);
   const [claimable, setClaimable] = useState<number | null>(null);
+  const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [kycVerified, setKycVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -21,7 +22,9 @@ export function useSawitBalance(publicKey?: string) {
   const load = useCallback(async (fresh = false) => {
     if (!publicKey) {
       setBalance(null);
+      setLiquid(null);
       setClaimable(null);
+      setAlreadyClaimed(false);
       setKycVerified(false);
       return;
     }
@@ -36,12 +39,16 @@ export function useSawitBalance(publicKey?: string) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'balance read failed');
       setBalance(Number(j.balance ?? 0));
+      setLiquid(Number(j.liquid_motes ?? 0) / 1e9);
       setClaimable(Number(j.claimable_motes ?? 0) / 1e9);
+      setAlreadyClaimed(Boolean(j.already_claimed ?? false));
       setKycVerified(Boolean(j.kyc_verified ?? false));
     } catch (e) {
       setErr(String(e));
       setBalance(null);
+      setLiquid(null);
       setClaimable(null);
+      setAlreadyClaimed(false);
       setKycVerified(false);
     } finally {
       setLoading(false);
@@ -52,5 +59,5 @@ export function useSawitBalance(publicKey?: string) {
     load();
   }, [load]);
 
-  return { balance, claimable, kycVerified, loading, err, reload: load };
+  return { balance, liquid, claimable, alreadyClaimed, kycVerified, loading, err, reload: load };
 }
