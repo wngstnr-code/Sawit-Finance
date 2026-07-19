@@ -34,6 +34,9 @@ pub enum DistError {
     Overflow = 11,
     NotKycVerified = 12,
     ClaimableExceedsPool = 13,
+    // New variants must always be appended at the end — the contract is
+    // upgradable in-place and existing error codes (notably 13) must never
+    // shift, or already-integrated tooling/tests would misinterpret reverts.
 }
 
 #[odra::event]
@@ -62,9 +65,18 @@ pub struct EpochSwept {
     pub timestamp: u64,
 }
 
+#[odra::event]
+pub struct EpochFunded {
+    pub epoch_number: u64,
+    pub amount_cspr: U512,
+    pub cumulative_funded_cspr: U512,
+    pub is_fully_funded: bool,
+    pub timestamp: u64,
+}
+
 const DEFAULT_CLAIM_WINDOW: u64 = 7_776_000_000u64;
 
-#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept], errors = DistError)]
+#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept, EpochFunded], errors = DistError)]
 pub struct SawitYieldDistributor {
     authority: Var<Address>,
     yield_router: Var<Address>,
@@ -82,6 +94,14 @@ pub struct SawitYieldDistributor {
     // introduced (pre-upgrade) are not reflected here — the cap protects every
     // allocation made from the upgrade onwards.
     claimable_total: Mapping<u64, U512>,
+    // Cumulative CSPR actually deposited into an epoch via fund_epoch, so
+    // funding can arrive in multiple top-up payments and only flips the
+    // stored `is_funded` flag once the pool is fully covered. Appended
+    // field: legacy epochs 1-3 funded before this upgrade have no entry
+    // here (reads as zero) — their solvency is governed entirely by the
+    // already-stored `is_funded` flag, which this module keeps reading and
+    // writing everywhere else for backward compatibility.
+    funded_amount: Mapping<u64, U512>,
 }
 
 #[odra::module]
@@ -191,8 +211,28 @@ impl SawitYieldDistributor {
     pub fn fund_epoch(&mut self, epoch_number: u64) {
         self.assert_authority();
         let mut epoch = self.get_epoch_or_revert(epoch_number);
-        epoch.is_funded = true;
+
+        let attached = self.env().attached_value();
+        let cumulative = self.funded_amount.get_or_default(&epoch_number) + attached;
+        self.funded_amount.set(&epoch_number, cumulative);
+
+        // Preserve the legacy top-up use case: funding may arrive across
+        // multiple fund_epoch calls, and the stored is_funded flag (which
+        // every other code path still reads) only flips once the cumulative
+        // amount covers the epoch's declared pool.
+        let is_fully_funded = cumulative >= epoch.total_distribution_cspr;
+        if is_fully_funded {
+            epoch.is_funded = true;
+        }
         self.epochs.set(&epoch_number, epoch);
+
+        self.env().emit_event(EpochFunded {
+            epoch_number,
+            amount_cspr: attached,
+            cumulative_funded_cspr: cumulative,
+            is_fully_funded,
+            timestamp: self.env().get_block_time(),
+        });
     }
 
     pub fn claim_yield(&mut self, epoch_number: u64) {
@@ -256,6 +296,9 @@ impl SawitYieldDistributor {
 
         let mut epoch = self.get_epoch_or_revert(epoch_number);
 
+        if !epoch.is_funded {
+            self.env().revert(DistError::EpochNotFunded)
+        }
         if epoch.is_swept {
             self.env().revert(DistError::EpochAlreadySwept)
         }
@@ -480,6 +523,82 @@ mod tests {
         dist.sweep_unclaimed(1u64);
         assert!(dist.get_epoch(1).unwrap().is_swept);
         assert_eq!(dist.get_total_distributed(), U512::from(1_000_000_000u64));
+    }
+
+    #[test]
+    fn test_partial_funding_blocks_claim_and_second_topup_enables_it() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+
+        // Partial funding must not flip is_funded, and claims must be blocked.
+        dist.with_tokens(U512::from(2_000_000_000u64)).fund_epoch(1u64);
+        assert!(!dist.get_epoch(1).unwrap().is_funded);
+
+        env.set_caller(holder);
+        let blocked = dist.try_claim_yield(1u64);
+        assert!(blocked.is_err());
+        env.set_caller(env.get_account(0));
+
+        // Completing the funding via a second top-up must flip is_funded and
+        // unblock claims.
+        dist.with_tokens(U512::from(3_000_000_000u64)).fund_epoch(1u64);
+        assert!(dist.get_epoch(1).unwrap().is_funded);
+
+        env.set_caller(holder);
+        dist.claim_yield(1u64);
+        assert!(dist.has_claimed(1u64, &holder));
+    }
+
+    #[test]
+    fn test_sweep_reverts_on_unfunded_epoch() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+        let result = dist.try_sweep_unclaimed(1u64);
+        assert!(result.is_err());
+        assert!(!dist.get_epoch(1).unwrap().is_swept);
+    }
+
+    #[test]
+    fn test_claim_window_expired() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        vault.register_kyc(holder);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+
+        env.set_caller(holder);
+        let result = dist.try_claim_yield(1u64);
+        assert!(result.is_err());
+        assert!(!dist.has_claimed(1u64, &holder));
     }
 
     #[test]

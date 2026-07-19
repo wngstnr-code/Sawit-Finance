@@ -239,4 +239,80 @@ mod tests {
         assert_eq!(token.balance_of(&holder), U256::from(500_000u64));
         assert_eq!(token.balance_of(&recipient), transfer_amount);
     }
+
+    #[test]
+    fn test_approve_and_transfer_from_happy_path() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let minter = env.get_account(1);
+        let owner = env.get_account(2);
+        let spender = env.get_account(3);
+        let recipient = env.get_account(4);
+
+        env.set_caller(minter);
+        let amount = U256::from(1_000_000u64);
+        token.mint(&owner, &amount, 1u64);
+
+        env.set_caller(owner);
+        token.approve(&spender, &U256::from(400_000u64));
+        assert_eq!(token.allowance(&owner, &spender), U256::from(400_000u64));
+
+        env.set_caller(spender);
+        token.transfer_from(&owner, &recipient, &U256::from(300_000u64));
+
+        assert_eq!(token.balance_of(&owner), U256::from(700_000u64));
+        assert_eq!(token.balance_of(&recipient), U256::from(300_000u64));
+        assert_eq!(token.allowance(&owner, &spender), U256::from(100_000u64));
+    }
+
+    #[test]
+    fn test_transfer_from_beyond_allowance_rejected() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let minter = env.get_account(1);
+        let owner = env.get_account(2);
+        let spender = env.get_account(3);
+        let recipient = env.get_account(4);
+
+        env.set_caller(minter);
+        token.mint(&owner, &U256::from(1_000_000u64), 1u64);
+
+        env.set_caller(owner);
+        token.approve(&spender, &U256::from(100_000u64));
+
+        env.set_caller(spender);
+        let result = token.try_transfer_from(&owner, &recipient, &U256::from(200_000u64));
+        assert!(result.is_err());
+        assert_eq!(token.balance_of(&owner), U256::from(1_000_000u64));
+    }
+
+    #[test]
+    fn test_pause_blocks_transfer_and_resume_unblocks() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let minter = env.get_account(1);
+        let holder = env.get_account(2);
+        let recipient = env.get_account(3);
+        let authority = env.get_account(0);
+
+        env.set_caller(minter);
+        token.mint(&holder, &U256::from(1_000_000u64), 1u64);
+
+        env.set_caller(authority);
+        token.pause_transfers();
+        assert!(token.is_paused());
+
+        env.set_caller(holder);
+        let blocked = token.try_transfer(&recipient, &U256::from(100_000u64));
+        assert!(blocked.is_err());
+        assert_eq!(token.balance_of(&recipient), U256::zero());
+
+        env.set_caller(authority);
+        token.resume_transfers();
+        assert!(!token.is_paused());
+
+        env.set_caller(holder);
+        token.transfer(&recipient, &U256::from(100_000u64));
+        assert_eq!(token.balance_of(&recipient), U256::from(100_000u64));
+    }
 }

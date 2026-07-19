@@ -53,11 +53,18 @@ pub struct TokensAllocated {
     pub timestamp: u64,
 }
 
+#[odra::event]
+pub struct ConfigUpdated {
+    pub token_rate: u64,
+    pub gorr_bps: u32,
+    pub timestamp: u64,
+}
+
 const DEFAULT_TOKEN_RATE: u64 = 1_000;
 const DEFAULT_GORR_BPS: u32 = 500;
 const MAX_GORR_BPS: u32 = 10_000;
 
-#[odra::module(events = [EpochMinted, TokensAllocated], errors = MinterError)]
+#[odra::module(events = [EpochMinted, TokensAllocated, ConfigUpdated], errors = MinterError)]
 pub struct SawitMinter {
     authority: Var<Address>,
     sawit_token: Var<Address>,
@@ -241,6 +248,12 @@ impl SawitMinter {
             }
             self.gorr_bps.set(bps);
         }
+
+        self.env().emit_event(ConfigUpdated {
+            token_rate: self.token_rate.get_or_default(),
+            gorr_bps: self.gorr_bps.get_or_default(),
+            timestamp: self.env().get_block_time(),
+        });
     }
 
     pub fn get_epoch_mint(&self, epoch_number: u64) -> Option<EpochMintRecord> {
@@ -357,6 +370,52 @@ mod tests {
         let pool = env.get_account(3);
 
         let result = minter.try_mint_epoch(1u64, pool);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_allocate_tokens_partial_then_exact_fill() {
+        let env = odra_test::env();
+        let (mut minter, _token, mut vault) = setup(&env);
+        let pool = env.get_account(3);
+        let investor_a = env.get_account(4);
+        let investor_b = env.get_account(5);
+
+        record_epoch(&env, &mut vault);
+        minter.mint_epoch(1u64, pool);
+
+        // total_round_deposits_cspr = 100, minted = 2_250_000 tokens.
+        // Investor A deposits 40/100 -> partial allocation, pool not yet full.
+        minter.allocate_tokens(1u64, investor_a, 40, 100);
+        let record = minter.get_epoch_mint(1).unwrap();
+        assert_eq!(record.tokens_allocated, U256::from(900_000u64));
+        assert!(!record.is_fully_allocated);
+
+        // Investor B deposits the remaining 60/100 -> exact fill flips the flag.
+        minter.allocate_tokens(1u64, investor_b, 60, 100);
+        let record = minter.get_epoch_mint(1).unwrap();
+        assert_eq!(record.tokens_allocated, record.tokens_minted);
+        assert!(record.is_fully_allocated);
+    }
+
+    #[test]
+    fn test_allocate_tokens_over_allocation_rejected() {
+        let env = odra_test::env();
+        let (mut minter, _token, mut vault) = setup(&env);
+        let pool = env.get_account(3);
+        let investor_a = env.get_account(4);
+        let investor_b = env.get_account(5);
+
+        record_epoch(&env, &mut vault);
+        minter.mint_epoch(1u64, pool);
+
+        // Investor A takes 90/100 of the round.
+        minter.allocate_tokens(1u64, investor_a, 90, 100);
+        assert!(!minter.get_epoch_mint(1).unwrap().is_fully_allocated);
+
+        // Investor B tries to claim another 90/100 share of the same round,
+        // which would exceed the remaining minted tokens.
+        let result = minter.try_allocate_tokens(1u64, investor_b, 90, 100);
         assert!(result.is_err());
     }
 }

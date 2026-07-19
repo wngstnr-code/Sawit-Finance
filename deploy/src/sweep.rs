@@ -36,7 +36,13 @@ fn main() {
         std::process::exit(1);
     }
 
-    let unclaimed = record.total_distribution_cspr - record.total_claimed_cspr;
+    let unclaimed = record
+        .total_distribution_cspr
+        .checked_sub(record.total_claimed_cspr)
+        .unwrap_or_else(|| {
+            eprintln!("SWEEP_WARN {{\"reason\":\"claimed_exceeds_pool\",\"epoch\":{epoch}}}: total_claimed_cspr > total_distribution_cspr, treating unclaimed as 0");
+            odra::casper_types::U512::zero()
+        });
     println!(
         "sweep_unclaimed({epoch}): {} CSPR unclaimed...",
         unclaimed.as_u128() as f64 / 1e9

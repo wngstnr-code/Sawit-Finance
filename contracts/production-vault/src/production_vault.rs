@@ -58,7 +58,19 @@ pub struct OracleReputationUpdated {
     pub timestamp: u64,
 }
 
-#[odra::module(events = [ProductionRecorded, OracleAgentUpdated, OracleReputationUpdated], errors = VaultError)]
+#[odra::event]
+pub struct KycRegistered {
+    pub investor: Address,
+    pub timestamp: u64,
+}
+
+#[odra::event]
+pub struct KycRevoked {
+    pub investor: Address,
+    pub timestamp: u64,
+}
+
+#[odra::module(events = [ProductionRecorded, OracleAgentUpdated, OracleReputationUpdated, KycRegistered, KycRevoked], errors = VaultError)]
 pub struct SawitProductionVault {
     authority: Var<Address>,
     oracle_agent: Var<Address>,
@@ -190,11 +202,19 @@ impl SawitProductionVault {
     pub fn register_kyc(&mut self, investor: Address) {
         self.assert_authority();
         self.kyc_whitelist.set(&investor, true);
+        self.env().emit_event(KycRegistered {
+            investor,
+            timestamp: self.env().get_block_time(),
+        });
     }
 
     pub fn revoke_kyc(&mut self, investor: Address) {
         self.assert_authority();
         self.kyc_whitelist.set(&investor, false);
+        self.env().emit_event(KycRevoked {
+            investor,
+            timestamp: self.env().get_block_time(),
+        });
     }
 
     pub fn set_active(&mut self, active: bool) {
@@ -322,6 +342,48 @@ mod tests {
         );
         assert_eq!(vault.get_oracle_reputation(), 85);
         assert_eq!(vault.get_oracle_submission_count(), 2);
+    }
+
+    #[test]
+    fn test_revoke_kyc_unverifies_holder() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let investor = env.get_account(2);
+
+        vault.register_kyc(investor);
+        assert!(vault.is_kyc_verified(&investor));
+
+        vault.revoke_kyc(investor);
+        assert!(!vault.is_kyc_verified(&investor));
+    }
+
+    #[test]
+    fn test_update_oracle_agent_swaps_authorization() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let old_oracle = env.get_account(1);
+        let new_oracle = env.get_account(4);
+
+        vault.update_oracle_agent(new_oracle);
+        assert_eq!(vault.get_oracle_agent(), new_oracle);
+
+        // Old agent can no longer record production.
+        env.set_caller(old_oracle);
+        let rejected = vault.try_record_production(
+            "Jun-26".to_string(),
+            45_000, 36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert!(rejected.is_err());
+
+        // New agent can record production.
+        env.set_caller(new_oracle);
+        vault.record_production(
+            "Jun-26".to_string(),
+            45_000, 36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert_eq!(vault.get_epoch_count(), 1);
     }
 
     #[test]
