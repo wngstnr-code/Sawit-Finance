@@ -253,6 +253,7 @@ The fix shipped as a **live, in-place package upgrade** — the contracts have b
 
 - **Upgrade tx** (same package hash `1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9`, state fully retained across the upgrade): [`7757f5ed…`](https://testnet.cspr.live/transaction/7757f5ed1c904744256e701b0ec63fdc0f9f8efe6c52d4ca365098710a85123b)
 - **Guard verified live:** an intentional 31-CSPR allocation against a 30-CSPR pool was rejected on-chain — `User error: 13` — [`20be11c9…`](https://testnet.cspr.live/transaction/20be11c94614482435f94407eefd5127a6a7309435b93b996dba93c97978e7b9)
+- **Second in-place upgrade** closed the root cause structurally: `fund_epoch` now tracks cumulative `funded_amount` and only marks an epoch funded once the pool is fully covered, and `sweep_unclaimed` rejects unfunded epochs — [`ba1a9b22…`](https://testnet.cspr.live/transaction/ba1a9b22c1e5862a7a4a9ab5409d79889893cdb0beed8feac6e234e94c2b8e72) (same package hash, state retained again)
 - Distributor purse solvency was restored with a payable top-up through `fund_epoch` (25 CSPR).
 
 This is the protocol lifecycle working as designed — **monitor → diagnose on-chain → patch → upgrade in place → verify with a real revert.** Casper's upgradable packages made the fix a deploy, not a migration.
