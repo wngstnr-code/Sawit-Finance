@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -523,4 +524,9 @@ async def main():
         await asyncio.sleep(30 * 24 * 3600)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # `--once` runs a single cycle and exits (used by CI / the GitHub Actions
+    # workflow and for on-demand demo triggers); default is the long-running loop.
+    if "--once" in sys.argv:
+        asyncio.run(run_oracle_cycle())
+    else:
+        asyncio.run(main())

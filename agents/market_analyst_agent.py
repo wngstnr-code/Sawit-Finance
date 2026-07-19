@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -331,10 +332,21 @@ def clamp_gorr(recommended: int, current: int) -> tuple[int, Optional[str]]:
 
     return safe, reason
 
+def demo_gorr_target(current_gorr: int) -> int:
+    """Pick a guaranteed-different, in-band GORR for demo/recording runs, so a manual
+    trigger always produces a real on-chain change (one clamp step, oscillating within
+    [MIN_GORR_BPS, MAX_GORR_BPS])."""
+    step = MAX_GORR_CHANGE_BPS
+    up = min(current_gorr + step, MAX_GORR_BPS)
+    if up != current_gorr:
+        return up
+    return max(current_gorr - step, MIN_GORR_BPS)
+
 async def apply_gorr_onchain(
     session: aiohttp.ClientSession,
     current_gorr: int,
     recommended_gorr: int,
+    demo_force: bool = False,
 ) -> Optional[str]:
     """Closed-loop step: apply the GORR recommendation on-chain via TokenMinter.update_config(); returns the deploy hash or None."""
     if recommended_gorr == current_gorr:
@@ -349,7 +361,7 @@ async def apply_gorr_onchain(
         log.info("[AUTONOMY] After safety rails, no effective change — no action")
         return None
 
-    if not AUTONOMY_MODE:
+    if not AUTONOMY_MODE and not demo_force:
         log.info(
             f"[AUTONOMY] (report-only) Would update GORR {current_gorr} → {safe_gorr} bps. "
             f"Set AUTONOMY_MODE=on to let the agent act."
@@ -358,7 +370,7 @@ async def apply_gorr_onchain(
 
     market_state = load_market_state()
     last_change_ts = market_state.get("last_gorr_change_ts")
-    if last_change_ts is not None:
+    if last_change_ts is not None and not demo_force:
         elapsed = time.time() - float(last_change_ts)
         if elapsed < GORR_CHANGE_COOLDOWN_SECONDS:
             remaining = GORR_CHANGE_COOLDOWN_SECONDS - elapsed
@@ -470,7 +482,7 @@ def format_report(state: ContractState, analysis: dict, timestamp: str) -> str:
     report += "\n╚══════════════════════════════════════════════════════════════╝"
     return report
 
-async def run_analysis_cycle():
+async def run_analysis_cycle(demo_force: bool = False):
     """Run one analysis cycle: read state → Gemini analysis → report."""
     now = datetime.now(timezone.utc)
     timestamp = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -489,7 +501,15 @@ async def run_analysis_cycle():
         print(report)
 
         recommended_gorr = int(analysis.get("gorr_recommendation_bps", state.gorr_bps))
-        gorr_deploy = await apply_gorr_onchain(session, state.gorr_bps, recommended_gorr)
+        if demo_force:
+            recommended_gorr = demo_gorr_target(state.gorr_bps)
+            log.info(
+                f"[DEMO] Forcing a fresh on-chain GORR change for recording: "
+                f"{state.gorr_bps} → {recommended_gorr} bps (cooldown + report-only gate bypassed)"
+            )
+        gorr_deploy = await apply_gorr_onchain(
+            session, state.gorr_bps, recommended_gorr, demo_force=demo_force
+        )
 
         return {
             "timestamp": timestamp,
@@ -516,4 +536,12 @@ async def main():
         await asyncio.sleep(ANALYSIS_INTERVAL_SECONDS)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # `--once` runs a single cycle and exits (used by CI / the GitHub Actions
+    # workflow); `--demo` (or DEMO_FORCE_GORR=1) forces one guaranteed on-chain GORR
+    # change on that run so a manual trigger always yields a fresh, clickable tx for
+    # recording. Default (no flags) is the long-running loop with all safety rails.
+    if "--once" in sys.argv:
+        demo = "--demo" in sys.argv or os.getenv("DEMO_FORCE_GORR", "").lower() in ("1", "on", "true")
+        asyncio.run(run_analysis_cycle(demo_force=demo))
+    else:
+        asyncio.run(main())

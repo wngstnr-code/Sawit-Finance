@@ -1,0 +1,128 @@
+name: Autonomous agents
+
+# Runs a Sawit Finance agent cycle in CI, signs a real Casper Testnet transaction,
+# and commits the resulting agent state back to the repo. Because sawitfinance.xyz
+# reads agents/.*state.json at runtime, that commit triggers a Vercel redeploy and
+# the Agent Control Room flips to "Active" with the fresh, on-chain tx.
+#
+#   • schedule           → market-analyst, honest autonomy (cooldown-protected)
+#   • workflow_dispatch  → pick the agent; `demo=true` forces one guaranteed GORR tx
+#                          (bypasses cooldown / report-only gate) for recording.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CASPER_SECRET_KEY_PEM  contents of the operator secret_key.pem (testnet key)
+#   ROOT_ENV               contents of the repo-root .env (ODRA livenet config)
+#   AGENTS_ENV             contents of agents/.env (contract hashes, GEMINI_API_KEY, …)
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: Which agent to run
+        type: choice
+        default: market-analyst
+        options: [market-analyst, oracle, both]
+      demo:
+        description: Force one guaranteed on-chain GORR change (for recording)
+        type: boolean
+        default: true
+  schedule:
+    # Daily 06:17 UTC — honest autonomy: acts only when Gemini recommends a change
+    # and the 24h cooldown has elapsed, otherwise it's a no-op (no commit).
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autonomous-agents
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve run parameters
+        id: flags
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "agent=market-analyst" >> "$GITHUB_OUTPUT"
+            echo "demo=false"           >> "$GITHUB_OUTPUT"
+          else
+            echo "agent=${{ github.event.inputs.agent }}" >> "$GITHUB_OUTPUT"
+            echo "demo=${{ github.event.inputs.demo }}"   >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent deps
+        run: pip install -r agents/requirements.txt
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build livenet bins
+        run: cargo build -p sawit-deploy --release --features livenet --bin read_state --bin set_gorr --bin record
+
+      - name: Reconstruct livenet env + operator key
+        env:
+          CASPER_SECRET_KEY_PEM: ${{ secrets.CASPER_SECRET_KEY_PEM }}
+          ROOT_ENV: ${{ secrets.ROOT_ENV }}
+          AGENTS_ENV: ${{ secrets.AGENTS_ENV }}
+        run: |
+          set -e
+          mkdir -p "$HOME/.casper-keys"
+          printf '%s\n' "$CASPER_SECRET_KEY_PEM" > "$HOME/.casper-keys/secret_key.pem"
+          chmod 600 "$HOME/.casper-keys/secret_key.pem"
+          printf '%s\n' "$ROOT_ENV" > .env
+          # Force the key path to the CI-materialized pem (dotenv: last key wins),
+          # overriding whatever local path is baked into ROOT_ENV.
+          printf '\nODRA_CASPER_LIVENET_SECRET_KEY_PATH=%s\n' "$HOME/.casper-keys/secret_key.pem" >> .env
+          printf '%s\n' "$AGENTS_ENV" > agents/.env
+
+      - name: Run agent cycle
+        working-directory: agents
+        env:
+          AUTONOMY_MODE: "on"
+          DEMO_FORCE_GORR: ${{ steps.flags.outputs.demo }}
+        run: |
+          set -e
+          case "${{ steps.flags.outputs.agent }}" in
+            oracle) python oracle_agent.py --once ;;
+            both)   python market_analyst_agent.py --once && python oracle_agent.py --once ;;
+            *)      python market_analyst_agent.py --once ;;
+          esac
+
+      - name: Commit + push agent state
+        run: |
+          set -e
+          git config user.name  "sawit-agent-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in .market_state.json .oracle_provenance.json .allocation_state.json .yield_state.json; do
+            [ -f "agents/$f" ] && git add -f "agents/$f"
+          done
+          if git diff --staged --quiet; then
+            echo "No agent state changes to commit (no-op cycle)."
+          else
+            git commit -m "chore(agents): autonomous cycle state $(date -u +%FT%TZ) [skip ci]"
+            git push
+            echo "Pushed fresh agent state — Vercel will redeploy sawitfinance.xyz."
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Autonomous agent cycle" >> "$GITHUB_STEP_SUMMARY"
+          echo "- agent: \`${{ steps.flags.outputs.agent }}\`  demo: \`${{ steps.flags.outputs.demo }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f agents/.market_state.json ]; then
+            tx=$(python -c "import json;print(json.load(open('agents/.market_state.json')).get('last_gorr_change_deploy') or '-')" 2>/dev/null || echo '-')
+            echo "- latest GORR tx: [\`$tx\`](https://testnet.cspr.live/transaction/$tx)" >> "$GITHUB_STEP_SUMMARY"
+          fi
