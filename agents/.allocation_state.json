@@ -1,0 +1,31 @@
+{
+  "0a6c6d53cf73e13e1bf7e5c962a48408687ef1b16d40a4595179b46958b96242": {
+    "deposit_cspr": 10,
+    "investor": "e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe",
+    "reason": "This deposit brings the sender's transaction count to 3 within 600 seconds, which is unusual retail behavior.",
+    "status": "flagged",
+    "timestamp": 1784540975.0075042
+  },
+  "3c74aca4a40fde9a32f65c27e4369ead25a6238328951f0bd4827a0f9935fdf2": {
+    "deposit_cspr": 10,
+    "epoch": 3,
+    "investor": "e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe",
+    "reason": {
+      "epoch": 3,
+      "reason": "epoch_not_minted"
+    },
+    "status": "failed",
+    "timestamp": 1784540972.3164153
+  },
+  "44577f39aa6391c548c6c078076f0a4cb48656e9cebdd90c9037530d1f15145e": {
+    "deposit_cspr": 30,
+    "epoch": 3,
+    "investor": "e8134d5d5caf9ace626209d09365af48a867a18199b5139da8873733c6c14efe",
+    "reason": {
+      "epoch": 3,
+      "reason": "epoch_not_minted"
+    },
+    "status": "failed",
+    "timestamp": 1784540935.4260569
+  }
+}
