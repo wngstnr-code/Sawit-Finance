@@ -234,7 +234,12 @@ def read_balance(account_hash: str) -> Optional[int]:
 # ── Price feed (unchanged) ──────────────────────────────────────────────────
 
 async def get_current_cpo_price(session: aiohttp.ClientSession) -> int:
-    """Fetch the current CPO benchmark price from KPBN via x402-gated API; returns USD cents per ton."""
+    """Fetch the current CPO benchmark price from KPBN via x402-gated API; returns USD cents per ton.
+
+    If the x402 facilitator is disabled or unreachable, this falls back to a fixed
+    REPRESENTATIVE price (not a live quote). The fallback is logged explicitly because
+    this value is written on-chain as the epoch's trigger price.
+    """
     log.info("[PRICE] Fetching CPO benchmark price (x402 micropayment)...")
 
     if X402_LIVE and X402_AVAILABLE and _x402_payer is not None:
@@ -250,9 +255,13 @@ async def get_current_cpo_price(session: aiohttp.ClientSession) -> int:
             log.warning(f"[PRICE] facilitator unreachable ({e}) — using fallback")
 
     await asyncio.sleep(0.2)
-    simulated_price = 83_500
-    log.info(f"[PRICE] Current CPO price: ${simulated_price/100:.2f}/ton")
-    return simulated_price
+    fallback_price = 83_500
+    log.warning(
+        f"[PRICE] ⚠️  SIMULATED FALLBACK — no x402-paid quote available. "
+        f"Using representative CPO price ${fallback_price/100:.2f}/ton. "
+        f"This value is recorded on-chain as the epoch trigger price."
+    )
+    return fallback_price
 
 
 # ── Real holder snapshot ─────────────────────────────────────────────────────

@@ -1,4 +1,19 @@
-"""Sawit Finance — AI Oracle Agent: scrapes Indonesian CPO production data (GAPKI/KPBN/MPOB), cross-validates with Gemini AI, and posts verified data on-chain to SawitProductionVault; pays for premium data via x402."""
+"""Sawit Finance — AI Oracle Agent.
+
+Assembles three Indonesian CPO source readings (GAPKI / KPBN / MPOB), cross-validates them
+with Gemini AI, and posts the verified epoch on-chain to SawitProductionVault. Premium
+sources are fetched via x402 micropayment when a facilitator is reachable.
+
+Data provenance — stated plainly, because this agent writes to chain:
+  * CPO PRICE is genuinely live (FRED/IMF `PPOILUSDM` via cpo_price.py) and anchors all
+    three source readings.
+  * PRODUCTION TONNAGE is a REPRESENTATIVE figure, not scraped. GAPKI/KPBN/MPOB publish
+    monthly aggregates as PDFs, not per-estate APIs, so no live tonnage source exists yet.
+    Only an x402-paid MPOB response supplies a non-constant tonnage.
+  * The cross-validation, divergence scoring, Gemini anomaly veto and on-chain reputation
+    score all run for real on top of that input.
+Per-cycle x402 payment status is recorded in `.oracle_provenance.json`.
+"""
 
 import asyncio
 import json
@@ -495,8 +510,8 @@ async def run_oracle_cycle():
         )
 
         log.info("[ORACLE] Production data validated:")
-        log.info(f"  CPO produced : {tons_cpo:,} tons")
-        log.info(f"  CPO price    : ${cpo_price_cents/100:,.2f}/ton")
+        log.info(f"  CPO produced : {tons_cpo:,} tons  [representative — not scraped live]")
+        log.info(f"  CPO price    : ${cpo_price_cents/100:,.2f}/ton  [live feed: {FEED_LABEL}]")
         log.info(f"  Revenue      : ${revenue_cents/100:,.0f}")
         log.info(f"  Daily output : {daily_output:,} ton/day")
         log.info(f"  OER          : {oer_pct}%")
