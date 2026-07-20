@@ -549,4 +549,71 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(vault.get_epoch_count(), 0);
     }
+
+    #[test]
+    fn test_update_oracle_agent_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let stranger = env.get_account(2);
+        let new_agent = env.get_account(4);
+        let original_oracle = env.get_account(1);
+
+        env.set_caller(stranger);
+        let result = vault.try_update_oracle_agent(new_agent);
+        assert_eq!(result.err(), Some(VaultError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(vault.get_oracle_agent(), original_oracle);
+    }
+
+    #[test]
+    fn test_register_kyc_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let stranger = env.get_account(2);
+        let investor = env.get_account(3);
+
+        env.set_caller(stranger);
+        let result = vault.try_register_kyc(investor);
+        assert_eq!(result.err(), Some(VaultError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(!vault.is_kyc_verified(&investor));
+    }
+
+    #[test]
+    fn test_revoke_kyc_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let stranger = env.get_account(2);
+        let investor = env.get_account(3);
+
+        vault.register_kyc(investor);
+
+        env.set_caller(stranger);
+        let result = vault.try_revoke_kyc(investor);
+        assert_eq!(result.err(), Some(VaultError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(vault.is_kyc_verified(&investor));
+    }
+
+    #[test]
+    fn test_set_active_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut vault = setup(&env);
+        let stranger = env.get_account(2);
+        let oracle = env.get_account(1);
+
+        env.set_caller(stranger);
+        let result = vault.try_set_active(false);
+        assert_eq!(result.err(), Some(VaultError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+
+        // Guard held: vault stayed active because the stranger's call was rejected.
+        env.set_caller(oracle);
+        vault.record_production(
+            "Jun-26".to_string(),
+            45_000, 36_000_000, 1_500, 22, 80_000, 12, 8, 85,
+            "GAPKI+KPBN".to_string(), 1_751_000_000_000u64,
+        );
+        assert_eq!(vault.get_epoch_count(), 1);
+    }
 }

@@ -421,4 +421,108 @@ mod tests {
         let result = minter.try_allocate_tokens(1u64, investor_b, 90, 100);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_mint_epoch_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut minter, _token, mut vault) = setup(&env);
+        let stranger = env.get_account(2);
+        let pool = env.get_account(3);
+
+        record_epoch(&env, &mut vault);
+
+        env.set_caller(stranger);
+        let result = minter.try_mint_epoch(1u64, pool);
+        assert_eq!(result.err(), Some(MinterError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(minter.get_epoch_mint(1).is_none());
+    }
+
+    #[test]
+    fn test_allocate_tokens_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut minter, _token, mut vault) = setup(&env);
+        let stranger = env.get_account(2);
+        let pool = env.get_account(3);
+        let investor = env.get_account(4);
+
+        record_epoch(&env, &mut vault);
+        minter.mint_epoch(1u64, pool);
+
+        env.set_caller(stranger);
+        let result = minter.try_allocate_tokens(1u64, investor, 10, 100);
+        assert_eq!(result.err(), Some(MinterError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(minter.get_epoch_mint(1).unwrap().tokens_allocated, U256::zero());
+    }
+
+    // update_config is the on-chain entry point behind the project's
+    // autonomous-agent GORR-tuning story, so it gets dedicated coverage for
+    // the authority guard, the happy path, and both validation reverts.
+
+    #[test]
+    fn test_update_config_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut minter, _token, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        env.set_caller(stranger);
+        let result = minter.try_update_config(Some(2_000u64), Some(700u32));
+        assert_eq!(result.err(), Some(MinterError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(minter.get_token_rate(), 1_000u64);
+        assert_eq!(minter.get_gorr_bps(), 500u32);
+    }
+
+    #[test]
+    fn test_update_config_updates_token_rate_and_gorr_bps() {
+        let env = odra_test::env();
+        let (mut minter, _token, _vault) = setup(&env);
+
+        minter.update_config(Some(2_500u64), Some(750u32));
+
+        assert_eq!(minter.get_token_rate(), 2_500u64);
+        assert_eq!(minter.get_gorr_bps(), 750u32);
+
+        // calculate_tokens must read the newly persisted config immediately.
+        let tokens = minter.calculate_tokens(45_000);
+        assert_eq!(
+            tokens,
+            U256::from(45_000u64) * U256::from(2_500u64) * U256::from(750u64) / U256::from(10_000u64)
+        );
+    }
+
+    #[test]
+    fn test_update_config_partial_update_leaves_other_field_untouched() {
+        let env = odra_test::env();
+        let (mut minter, _token, _vault) = setup(&env);
+
+        minter.update_config(Some(3_000u64), None);
+        assert_eq!(minter.get_token_rate(), 3_000u64);
+        assert_eq!(minter.get_gorr_bps(), 500u32);
+
+        minter.update_config(None, Some(1_200u32));
+        assert_eq!(minter.get_token_rate(), 3_000u64);
+        assert_eq!(minter.get_gorr_bps(), 1_200u32);
+    }
+
+    #[test]
+    fn test_update_config_rejects_gorr_above_max() {
+        let env = odra_test::env();
+        let (mut minter, _token, _vault) = setup(&env);
+
+        let result = minter.try_update_config(None, Some(10_001u32));
+        assert_eq!(result.err(), Some(MinterError::InvalidGorrBps.into()));
+        assert_eq!(minter.get_gorr_bps(), 500u32);
+    }
+
+    #[test]
+    fn test_update_config_rejects_zero_token_rate() {
+        let env = odra_test::env();
+        let (mut minter, _token, _vault) = setup(&env);
+
+        let result = minter.try_update_config(Some(0u64), None);
+        assert_eq!(result.err(), Some(MinterError::InvalidTokenRate.into()));
+        assert_eq!(minter.get_token_rate(), 1_000u64);
+    }
 }

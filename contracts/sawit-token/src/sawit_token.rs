@@ -318,4 +318,47 @@ mod tests {
         token.transfer(&recipient, &U256::from(100_000u64));
         assert_eq!(token.balance_of(&recipient), U256::from(100_000u64));
     }
+
+    #[test]
+    fn test_set_minter_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let stranger = env.get_account(2);
+        let new_minter = env.get_account(4);
+        let original_minter = env.get_account(1);
+
+        env.set_caller(stranger);
+        let result = token.try_set_minter(new_minter);
+        assert_eq!(result.err(), Some(TokenError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(token.get_minter(), original_minter);
+    }
+
+    #[test]
+    fn test_pause_transfers_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let stranger = env.get_account(2);
+
+        env.set_caller(stranger);
+        let result = token.try_pause_transfers();
+        assert_eq!(result.err(), Some(TokenError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(!token.is_paused());
+    }
+
+    #[test]
+    fn test_resume_transfers_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let mut token = setup(&env);
+        let stranger = env.get_account(2);
+
+        token.pause_transfers();
+
+        env.set_caller(stranger);
+        let result = token.try_resume_transfers();
+        assert_eq!(result.err(), Some(TokenError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(token.is_paused());
+    }
 }

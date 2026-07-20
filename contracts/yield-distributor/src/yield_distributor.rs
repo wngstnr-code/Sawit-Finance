@@ -851,4 +851,191 @@ mod tests {
         let epoch = dist.get_epoch(1).unwrap();
         assert_eq!(epoch.claim_deadline, epoch.created_at + new_window);
     }
+
+    #[test]
+    fn test_set_claimable_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+        let holder = env.get_account(3);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+
+        env.set_caller(stranger);
+        let result = dist.try_set_claimable(1u64, holder, U512::from(1_000_000_000u64));
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(dist.get_claimable(1u64, &holder), U512::zero());
+    }
+
+    #[test]
+    fn test_set_claimable_batch_happy_path() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let a = env.get_account(2);
+        let b = env.get_account(3);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            2u64,
+            85_000u64,
+        );
+
+        dist.set_claimable_batch(
+            1u64,
+            vec![a, b],
+            vec![U512::from(2_000_000_000u64), U512::from(3_000_000_000u64)],
+        );
+
+        assert_eq!(dist.get_claimable(1u64, &a), U512::from(2_000_000_000u64));
+        assert_eq!(dist.get_claimable(1u64, &b), U512::from(3_000_000_000u64));
+        assert_eq!(dist.get_claimable_total(1u64), U512::from(5_000_000_000u64));
+    }
+
+    #[test]
+    fn test_set_claimable_batch_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+        let a = env.get_account(3);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+
+        env.set_caller(stranger);
+        let result =
+            dist.try_set_claimable_batch(1u64, vec![a], vec![U512::from(1_000_000_000u64)]);
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(dist.get_claimable_total(1u64), U512::zero());
+    }
+
+    #[test]
+    fn test_fund_epoch_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+
+        env.set_caller(stranger);
+        let result = dist
+            .with_tokens(U512::from(1_000_000_000u64))
+            .try_fund_epoch(1u64);
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(!dist.get_epoch(1).unwrap().is_funded);
+    }
+
+    #[test]
+    fn test_sweep_unclaimed_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        dist.with_tokens(U512::from(5_000_000_000u64)).fund_epoch(1u64);
+        env.advance_block_time(DEFAULT_CLAIM_WINDOW + 1);
+
+        env.set_caller(stranger);
+        let result = dist.try_sweep_unclaimed(1u64);
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert!(!dist.get_epoch(1).unwrap().is_swept);
+    }
+
+    #[test]
+    fn test_create_epoch_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        env.set_caller(stranger);
+        let result = dist.try_create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        assert_eq!(result.err(), Some(DistError::UnauthorizedYieldRouter.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(dist.get_current_epoch(), 0);
+    }
+
+    #[test]
+    fn test_dist_set_active_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+
+        env.set_caller(stranger);
+        let result = dist.try_set_active(false);
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+
+        // Guard held: distributor stayed active because the stranger's call
+        // was rejected, so create_epoch still succeeds.
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        assert_eq!(dist.get_current_epoch(), 1);
+    }
+
+    #[test]
+    fn test_update_yield_router_rejects_unauthorized_caller() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let stranger = env.get_account(2);
+        let new_router = env.get_account(4);
+        let original_router = env.get_account(1);
+
+        env.set_caller(stranger);
+        let result = dist.try_update_yield_router(new_router);
+        assert_eq!(result.err(), Some(DistError::UnauthorizedAuthority.into()));
+        env.set_caller(env.get_account(0));
+        assert_eq!(dist.get_yield_router(), original_router);
+    }
+
+    #[test]
+    fn test_update_yield_router_authority_can_update() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let new_router = env.get_account(4);
+
+        dist.update_yield_router(new_router);
+        assert_eq!(dist.get_yield_router(), new_router);
+
+        // The new router is now authorized to create epochs.
+        env.set_caller(new_router);
+        dist.create_epoch(
+            "Jun-26".to_string(),
+            U512::from(5_000_000_000u64),
+            1u64,
+            85_000u64,
+        );
+        assert_eq!(dist.get_current_epoch(), 1);
+    }
 }
