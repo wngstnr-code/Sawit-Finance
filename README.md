@@ -14,6 +14,16 @@ Built for the **Casper Agentic Buildathon 2026**.
 > - **⛓️ See the loop on-chain:** KYC-gated yield claim [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) on cspr.live (record→mint→fund→claim — [full loop below](#live-on-casper-testnet--the-full-loop-executed-on-chain))
 > - **🤖 Agentic write:** an autonomous agent's GORR decision, broadcast on-chain [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (read→reason→write, with safety rails)
 > - **🔌 Toolkit:** [Casper MCP server](#the-agentic-layer) (7 live-state tools) + **official-protocol x402 settlement** [`1ea0a5f2…`](https://testnet.cspr.live/deploy/1ea0a5f2c4a03a282055ecb9e826108bb4ad3d04e8e5530d9baf856f27e490f3) — an agent paid a CEP-18 `transfer_with_authorization` (EIP-712, gasless) for gated CPO data
+>
+> **Don't trust the explorer links — check the chain directly.** Every transaction claim in this README resolves at the data layer, not just as a URL that returns 200. Verify any of them against a public node:
+>
+> ```bash
+> curl -sS -X POST https://node.testnet.casper.network/rpc -H 'Content-Type: application/json' \
+>   -d '{"jsonrpc":"2.0","id":1,"method":"info_get_transaction",
+>        "params":{"transaction_hash":{"Version1":"95026df66c129a8b86baca0f2f119e7c851f124c0406ca897c629f6becf362f5"}}}'
+> ```
+>
+> That one returns the AI agent's own GORR change: entry point `update_config`, `new_gorr_bps = 600`, against the TokenMinter package, `error_message: null`. Swap in any hash below.
 
 ---
 
@@ -110,7 +120,14 @@ Three autonomous agents run the protocol — two with a real LLM at the decision
 
 **Every agent writes on-chain — for real (no simulated hashes).** Each agent signs and broadcasts its decision as a live Casper transaction: the Oracle records verified production ([`2e6e00b1…`](https://testnet.cspr.live/transaction/2e6e00b168066072d960184fdee4300c46a946dbb3b6b6b141c8fcb8166e8ac6)), the Yield Router funds a distribution epoch ([`3cb6b496…`](https://testnet.cspr.live/transaction/3cb6b496392c88b80e2ebe64820d2858b78e948072f963ac52b9f122438856b8)), and the Market Analyst tunes GORR ([`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0)). Two agents are **LLM-driven** (Oracle, Market Analyst — Gemini 2.5 Flash); the Yield Router is a **rule-based trigger**. All three act through the same signed-livenet path.
 
-**Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded — here's an actual agent-driven GORR change on Testnet: [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (the agent moved GORR 510→500 bps). **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band — a hallucinated recommendation can never harm holders.
+**Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded, and it isn't a one-off — the agent has tuned GORR on-chain across separate cycles, from its own fresh analysis each time:
+
+| Cycle | Agent's decision | Tx |
+|-------|------------------|-----|
+| 1 | GORR 510 → 500 bps | [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) |
+| 2 | GORR 500 → 600 bps | [`95026df6…`](https://testnet.cspr.live/transaction/95026df66c129a8b86baca0f2f119e7c851f124c0406ca897c629f6becf362f5) |
+
+**Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band, with a 24h cooldown between changes — a hallucinated recommendation can never harm holders. Both cycles landed inside those rails.
 
 **Gemini reasoning gate.** Before data hits the chain, the Oracle Agent passes all 3 source readings to Gemini, which flags seasonal anomalies / suspicious spikes and can veto a submission (`"recommendation": "REJECT"` blocks the epoch regardless of the statistical score).
 
@@ -137,7 +154,17 @@ This is a **data-source** limitation, not an architectural one. The pipeline is 
 | `get_contracts` / `get_economic_loop` | deployed hashes + executed-loop tx (cspr.live links) |
 | `refresh_protocol_state` | force a fresh live read of all four contracts |
 
-See **[docs/mcp-evidence.md](docs/mcp-evidence.md)** for a captured Claude Desktop session invoking these tools live over MCP (config + reproduction steps included).
+**See it connected:** the [demo video](https://youtu.be/jT4uH5fRL8E) shows Claude Desktop connected to this server and invoking these tools live against Casper Testnet. To reproduce it yourself, add the server to your MCP client config:
+
+```jsonc
+// claude_desktop_config.json → "mcpServers"
+"sawit-finance": {
+  "command": "/absolute/path/to/sawit-fi/.venv/bin/python",
+  "args": ["/absolute/path/to/sawit-fi/agents/mcp_server.py"]
+}
+```
+
+Restart the client and ask it *"what's the current SAWIT protocol state?"* — the tools above resolve against live contract state, no API glue.
 
 ---
 
@@ -197,7 +224,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 
 ```bash
 # 1. Contracts — run all tests incl. the full e2e pipeline (no node needed)
-cargo +nightly-2026-01-01 test            # 42 tests, incl. record→mint→KYC→claim
+cargo +nightly-2026-01-01 test            # 65 tests, incl. record→mint→KYC→claim
 
 # 2. Agents
 python3 -m venv .venv && ./.venv/bin/pip install -r agents/requirements.txt
@@ -222,7 +249,7 @@ npm run agent         # terminal 3 — agent pays 1 SAWITX, settles on Testnet
 
 # 5. Frontend — landing + investor dashboard
 cd frontend && npm install
-cp .env.local.example .env.local          # or create it; see frontend/README.md for vars
+cp .env.local.example .env.local          # every var documented inline; all optional for a read-only run
 npm run dev                               # http://localhost:3000
 ```
 
@@ -286,6 +313,37 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 > Sequencing rationale: CSPR yield ships in v1 because the native-CSPR loop works today with zero external dependencies; csprUSD is a clean, well-scoped swap once mainnet-live. Real mill data is a partnership problem, not an architecture problem — the verification pipeline, CPI-locked minting, and oracle reputation scoring don't change.
 
+### How it makes money
+
+The protocol takes a **protocol fee on distributed yield** — a basis-point cut of each epoch's CSPR/csprUSD distribution, taken at `fund_epoch` time so it is visible on-chain rather than deducted off-ledger. That aligns revenue with the only thing holders care about: yield actually reaching them. Nothing accrues if nothing is distributed.
+
+Two secondary lines, both already technically live rather than hypothetical:
+- **x402-gated CPO data.** The verification pipeline's cleaned, cross-validated CPO price and production feed is already served behind x402 micropayments. Any third-party agent can pay per request today — the same rails our own oracle uses. This is a machine-to-machine data business that needs no additional trust from the buyer.
+- **Estate onboarding.** Mills and cooperatives pay to have their production tokenized and financed against, replacing working-capital lending that in Indonesia is typically expensive or unavailable to smallholder-linked mills.
+
+GORR (the mint rate the AI agent tunes) is the protocol's core economic dial and stays bounded — see the safety rails above and the DAO-governed bounds in Phase 3.
+
+### Regulatory path
+
+A revenue-sharing claim on a real Indonesian commodity is a regulated instrument, not a memecoin, and we plan for that rather than around it:
+
+- **Crypto-asset regulation.** Oversight of crypto assets in Indonesia transferred from Bappebti to **OJK** under POJK 27/2024. Any public offering runs through that regime and a licensed local entity (PT PMA or PT), not an offshore wrapper.
+- **Instrument classification.** A tokenized revenue claim will most likely be treated as a securities-like offering. Phase 3's "licensed-operator + KYC-provider integration" is exactly this: a legal opinion on classification, then either a private-placement structure for accredited participants or a licensed public offering — determined by counsel, not by us.
+- **Commodity-side compliance.** Palm oil is subject to export levies (BPDPKS), DMO/DPO policy, and ISPO sustainability certification. Estate partners must be ISPO-certified; the oracle records the certification reference alongside production so that compliance is auditable on-chain.
+- **KYC/AML.** Already enforced today — claims are cross-contract KYC-gated at the contract level, so the compliance boundary is in the protocol rather than bolted onto a frontend.
+
+> Honest status: this is the **planned** path, validated against public regulation, not legal advice we have already obtained. No entity is incorporated and no licence has been applied for. Engaging Indonesian counsel is the Phase 1 gate, and we would rather state that plainly than imply approvals we don't have.
+
+### Known risks
+
+| Risk | Mitigation |
+|------|-----------|
+| **Single operator key** controls privileged entry points | Disclosed above; multi-sig in Phase 3. Today the mitigation is that mint amounts are CPI-locked to on-chain records and every action leaves a permanent receipt |
+| **Tonnage is representative**, not yet a live feed | Stated plainly everywhere it appears, including in agent logs. Phase 2 gate |
+| **Oracle centralization** — one agent posts production | On-chain rolling reputation score makes inaccuracy visible and permanent; multi-oracle in Phase 3 |
+| **CSPR/USD FX mismatch** — revenue is USD, yield is CSPR | csprUSD migration is Phase 1 |
+| **Regulatory classification** could restrict a public offering | Private placement is the fallback structure; contracts are upgradable and KYC is already enforced on-chain |
+
 **Who's building this:** Sawit Finance is designed, built, and operated solo by [Wangsit Nursyahada](https://github.com/wngstnr-code) ([@wnsstt](https://x.com/wnsstt)) — the same operator who deployed the contracts, ran the agents, and shipped the three live in-place upgrades documented above, including the epoch-1 incident response. One person, but a protocol that's already been *operated*, not just demoed.
 
 **Where to follow the build:** [X / Twitter @wnsstt](https://x.com/wnsstt) (active) · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159) · live app [sawitfinance.xyz](https://sawitfinance.xyz)
@@ -296,13 +354,13 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 
 | Criterion | Implementation |
 |-----------|---------------|
-| Technical Execution | 4 Odra contracts, 42 tests (incl. full e2e), 3 real CPIs, full loop live on Testnet |
+| Technical Execution | 4 Odra contracts, 65 tests (incl. full e2e + access-control guards on every privileged entry point), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
 | Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
-| Working Contracts | 42 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
+| Working Contracts | 65 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
 | Long-Term Launch Plans | Milestone-gated [Launch Plan](#launch-plan) — security review → mainnet → real mill data → decentralized trust; active socials |
 
 ---
