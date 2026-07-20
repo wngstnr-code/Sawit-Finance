@@ -197,7 +197,7 @@ export default function ExploreView() {
                       onChange={(e) => handleAmountChange(e.target.value)}
                       inputMode="decimal"
                       placeholder="0"
-                      className="w-0 flex-1 bg-transparent font-display text-3xl tabular-nums text-ink outline-none placeholder:text-faint"
+                      className="w-0 flex-1 rounded-lg bg-transparent font-display text-3xl tabular-nums text-ink outline-none placeholder:text-faint focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                     />
                     <div className="shrink-0 text-right">
                       <div className="flex items-center justify-end gap-2 text-[15px] font-medium text-ink">

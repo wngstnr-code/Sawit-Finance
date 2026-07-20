@@ -8,6 +8,57 @@ export const maxDuration = 180;
 
 const inProgress = new Map<string, boolean>();
 
+// --- rate limiting (defence-in-depth) ---------------------------------------
+// This is an unauthenticated public endpoint that triggers a REAL on-chain
+// transaction paid for by the project's own authority wallet — a testnet
+// demo faucet-style flow. `inProgress` above only stops concurrent
+// double-submits for the *same* account; it does nothing against sequential
+// spam across many different account hashes. These two extra layers cap
+// that: a per-IP request limit, and a global circuit breaker on total
+// demo-KYC transactions per hour so the wallet can't be drained even by an
+// attacker rotating IPs/accounts.
+//
+// NOTE: state is a plain in-memory Map — it resets on cold start / per
+// serverless instance, so it is not a hard cross-instance guarantee. Good
+// enough for a testnet demo faucet; do not rely on this alone in production.
+const IP_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const IP_MAX_REQUESTS = 3;
+const GLOBAL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const GLOBAL_MAX_TX = 20;
+
+const ipHits = new Map<string, number[]>();
+let globalHits: number[] = [];
+
+function pruneOld(timestamps: number[], windowMs: number, now: number): number[] {
+  return timestamps.filter((t) => now - t < windowMs);
+}
+
+function getClientIp(req: Request): string {
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.headers.get('x-real-ip') || 'unknown';
+}
+
+function checkIpRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const hits = pruneOld(ipHits.get(ip) || [], IP_WINDOW_MS, now);
+  if (hits.length >= IP_MAX_REQUESTS) {
+    ipHits.set(ip, hits);
+    return false;
+  }
+  hits.push(now);
+  ipHits.set(ip, hits);
+  return true;
+}
+
+function checkGlobalRateLimit(): boolean {
+  const now = Date.now();
+  globalHits = pruneOld(globalHits, GLOBAL_WINDOW_MS, now);
+  if (globalHits.length >= GLOBAL_MAX_TX) return false;
+  globalHits.push(now);
+  return true;
+}
+
 function loadEnvFile(file: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!existsSync(file)) return out;
@@ -86,6 +137,27 @@ export async function POST(req: Request) {
 
   if (!/^[0-9a-f]{64}$/i.test(account)) {
     return NextResponse.json({ ok: false, error: 'invalid account' }, { status: 400 });
+  }
+
+  const ip = getClientIp(req);
+  if (!checkIpRateLimit(ip)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Too many demo-KYC requests from this IP — max ${IP_MAX_REQUESTS} per 10 minutes. Try again shortly.`,
+      },
+      { status: 429 }
+    );
+  }
+
+  if (!checkGlobalRateLimit()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Demo-KYC faucet has hit its hourly transaction cap. Please try again later.',
+      },
+      { status: 429 }
+    );
   }
 
   if (inProgress.get(account)) {

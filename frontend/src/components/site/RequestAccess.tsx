@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ACCESS_EMAIL } from '@/lib/config';
 
 type Phase = 'idle' | 'sending' | 'success' | 'error';
@@ -154,15 +154,7 @@ export default function RequestAccess({
                   <Field label="Intended allocation (USD)" name="allocation" placeholder="50,000  (optional)" />
                   <Field label="Organization" name="entity" placeholder="Optional" />
                 </div>
-                <div>
-                  <label className="text-[12px] font-medium text-ink">Message</label>
-                  <textarea
-                    name="message"
-                    rows={3}
-                    placeholder="Anything we should know? (optional)"
-                    className="mt-1.5 w-full rounded-xl border border-line bg-bg-2/40 px-3.5 py-2.5 text-[14px] text-ink outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus:bg-card"
-                  />
-                </div>
+                <MessageField />
 
                 {phase === 'error' && (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[13px] text-amber-700">
@@ -189,6 +181,9 @@ export default function RequestAccess({
   );
 }
 
+const FIELD_CLASS =
+  'mt-1.5 w-full rounded-xl border border-line bg-bg-2/40 px-3.5 py-2.5 text-[14px] text-ink outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus:bg-card focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1';
+
 function Field({
   label,
   name,
@@ -204,20 +199,40 @@ function Field({
   placeholder?: string;
   mono?: boolean;
 }) {
+  const reactId = useId();
+  const id = `access-field-${name}-${reactId}`;
   return (
     <div>
-      <label className="text-[12px] font-medium text-ink">
+      <label htmlFor={id} className="text-[12px] font-medium text-ink">
         {label}
         {required && <span className="text-brand"> *</span>}
       </label>
       <input
+        id={id}
         type={type}
         name={name}
         required={required}
         placeholder={placeholder}
-        className={`mt-1.5 w-full rounded-xl border border-line bg-bg-2/40 px-3.5 py-2.5 text-[14px] text-ink outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus:bg-card ${
-          mono ? 'font-mono text-[13px]' : ''
-        }`}
+        className={`${FIELD_CLASS} ${mono ? 'font-mono text-[13px]' : ''}`}
+      />
+    </div>
+  );
+}
+
+function MessageField() {
+  const reactId = useId();
+  const id = `access-field-message-${reactId}`;
+  return (
+    <div>
+      <label htmlFor={id} className="text-[12px] font-medium text-ink">
+        Message
+      </label>
+      <textarea
+        id={id}
+        name="message"
+        rows={3}
+        placeholder="Anything we should know? (optional)"
+        className={FIELD_CLASS}
       />
     </div>
   );

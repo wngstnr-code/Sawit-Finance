@@ -1,25 +1,46 @@
 # Sawit Finance — Brand & Design System
 
-Premium, institutional, calm — modelled on ondo.finance. Clean white/black with
-an indigo accent (NO green in the palette), rounded-geometric type, cinematic but
-cool-graded photography, generous whitespace.
+Premium, institutional, calm — modelled on ondo.finance. Clean off-white/black
+with a **green** brand accent (palm-oil / plantation green), rounded-geometric
+type, cinematic photography, generous whitespace.
+
+This document is kept in sync with what actually ships: `tailwind.config.ts`
+(palette) and `src/app/layout.tsx` (typography) are the sources of truth.
 
 ## Palette
-- Backgrounds: near-white `#FBFBFC` (`bg`), light grey `#F4F4F6` (`bg-2`), white cards
-- Lines: `#EAEAEC` / `#E0E0E4`
-- Text: near-black `#0B0B0C` (`ink`), muted `#5B5D66`, faint `#9A9CA4`
-- Accent (indigo/periwinkle): `#4F57E8` (`brand`), mid `#6670EE`, bright `#8C93F4`, tint `#ECEEFC`
-- Graphic accents: violet `#9B5DE5`, orange `#FB7A3C` (dotted map nodes, bridge dots)
-- Primary buttons + floating nav = **black** pill; accent indigo for links/eyebrows.
+
+Source: `tailwind.config.ts`.
+
+- Backgrounds: near-white `#FBFBFC` (`bg`), light grey `#F4F4F6` (`bg-2`), white cards (`card`)
+- Lines: `#EAEAEC` (`line`) / `#E0E0E4` (`line-2`)
+- Text: near-black `#0B0B0C` (`ink`), muted `#5B5D66` (`muted`), faint `#9A9CA4` (`faint`)
+- Accent (green): `#1E7A4F` (`brand` DEFAULT), mid `#2E9E68` (`brand-mid`),
+  bright `#34A86B` (`brand-bright`), tint `#E7F2EC` (`brand-tint`)
+- Graphic accents: violet `#9B5DE5`, orange `#FB7A3C` (chart highlights, status dots)
+- Primary buttons + top nav = **black** (`ink`) pill; green (`brand`) for links,
+  eyebrows, active nav state, and keyboard focus rings.
 
 ## Typography
-- Display + body: **Onest** (rounded geometric grotesque, Ondo-like).
-- Data / hashes: **JetBrains Mono**, tabular-nums.
 
-## Motion (Ondo-fidelity)
-framer-motion + lenis. Scroll-morph hero, count-up numbers, whileInView reveals,
-logo marquee, dotted archipelago map, alternating light/dark sections, giant wordmark.
+Source: `src/app/layout.tsx` (loaded via `next/font/google`).
+
+- Display + sans body: **Space Grotesk** (rounded geometric grotesque) —
+  CSS vars `--font-display` / `--font-sans`.
+- Serif accents (editorial headings, pull quotes): **Fraunces**, normal and
+  italic weights — CSS var `--font-serif`.
+- Data / hashes / addresses: **JetBrains Mono**, tabular-nums — CSS var
+  `--font-mono`.
+
+Tailwind exposes these as `font-display`, `font-sans`, `font-serif`, and
+`font-mono` (`tailwind.config.ts`).
+
+## Motion
+
+framer-motion-driven scroll reveals, count-up numbers, and a `fade-up`
+keyframe animation (`tailwind.config.ts` → `keyframes.fade-up` /
+`animation.fade-up`). Interactive elements use `focus-visible:ring-2
+focus-visible:ring-brand` for keyboard-accessible focus states.
 
 ## Imagery
-Aerial palm photography in `public/hero/`, **cool-graded** (desaturated + indigo
-tint) so it reads muted/premium, not green. Credit: T. R. Shankar Raman, CC BY-SA 4.0.
+
+Aerial palm photography in `public/hero/`. Credit: T. R. Shankar Raman, CC BY-SA 4.0.

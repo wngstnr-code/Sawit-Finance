@@ -159,7 +159,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
         const detail = res
           ? JSON.stringify(res).slice(0, 240)
           : 'send() returned undefined (no response from wallet/proxy)';
-        setClaim({ phase: 'error', message: `Not submitted — ${detail}` });
+        setClaim({ phase: 'error', message: humanError(new Error(detail)) });
       }
     } catch (e) {
       console.error('[claim] send() threw →', e);
@@ -187,7 +187,7 @@ export function InvestorProvider({ children }: { children: ReactNode }) {
           const detail = res
             ? JSON.stringify(res).slice(0, 240)
             : 'send() returned undefined (no response from wallet/proxy)';
-          setBuy({ phase: 'error', message: `Not submitted — ${detail}` });
+          setBuy({ phase: 'error', message: humanError(new Error(detail)) });
         }
       } catch (e) {
         console.error('[buy] send() threw →', e);

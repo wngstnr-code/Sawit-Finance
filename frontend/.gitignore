@@ -24,8 +24,13 @@ yarn-error.log*
 .pnpm-debug.log*
 
 .env*
+!.env.local.example
 
 .vercel
+
+# backup of the pre-compression hero video (see frontend brief task 6) —
+# kept locally only, never committed
+public/hero/hero.original.mp4
 
 *.tsbuildinfo
 next-env.d.ts

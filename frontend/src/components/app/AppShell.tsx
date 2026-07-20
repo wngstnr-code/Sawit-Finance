@@ -32,6 +32,7 @@ function Shell({ children }: { children: ReactNode }) {
 function TopNav() {
   const { t } = useLocale();
   const pathname = usePathname();
+  const [toolsOpen, setToolsOpen] = useState(false);
   const isActive = (href: string) =>
     href === '/app' ? pathname === '/app' : pathname.startsWith(href);
   const toolsActive = pathname.startsWith('/app/tools');
@@ -76,8 +77,20 @@ function TopNav() {
           ))}
 
           {/* Tools dropdown */}
-          <div className="group relative">
+          <div
+            className="group relative"
+            onMouseEnter={() => setToolsOpen(true)}
+            onMouseLeave={() => setToolsOpen(false)}
+            onFocus={() => setToolsOpen(true)}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setToolsOpen(false);
+            }}
+          >
             <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={toolsOpen}
+              onClick={() => setToolsOpen((v) => !v)}
               className={`flex items-center gap-1 pb-1 text-[14px] transition-colors ${
                 toolsActive
                   ? 'border-b-2 border-brand font-medium text-ink'
@@ -85,14 +98,24 @@ function TopNav() {
               }`}
             >
               {t.app.nav.tools}
-              <span className="text-[9px] transition-transform group-hover:rotate-180">▾</span>
+              <span
+                className={`text-[9px] transition-transform ${toolsOpen ? 'rotate-180' : ''}`}
+              >
+                ▾
+              </span>
             </button>
-            <div className="invisible absolute left-1/2 top-full z-40 -translate-x-1/2 pt-3 opacity-0 transition-all group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+            <div
+              role="menu"
+              className={`absolute left-1/2 top-full z-40 -translate-x-1/2 pt-3 transition-all ${
+                toolsOpen ? 'visible opacity-100' : 'invisible opacity-0'
+              }`}
+            >
               <div className="w-64 overflow-hidden rounded-xl border border-line bg-card shadow-card-lg">
                 {TOOLS.map((tool) => (
                   <Link
                     key={tool.href}
                     href={tool.href}
+                    role="menuitem"
                     className={`block px-4 py-3 transition-colors hover:bg-bg-2 ${
                       pathname.startsWith(tool.href) ? 'bg-bg-2' : ''
                     }`}
@@ -157,9 +180,10 @@ function WalletMenu() {
   if (!connected) {
     return (
       <button
+        type="button"
         onClick={connect}
         disabled={!ready}
-        className="flex items-center rounded-lg bg-ink px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-ink/90 disabled:opacity-50"
+        className="flex items-center rounded-lg bg-ink px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-ink/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         {ready ? t.app.connect.connect : t.app.connect.loading}
       </button>
@@ -169,8 +193,11 @@ function WalletMenu() {
   return (
     <div className="relative">
       <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 font-mono text-[13px] text-white transition-colors hover:bg-ink/90"
+        className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 font-mono text-[13px] text-white transition-colors hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         <span className="hidden sm:inline">{shortHash(publicKey, 4, 4)}</span>
         <span className="sm:hidden">{shortHash(publicKey, 3, 3)}</span>
@@ -188,7 +215,7 @@ function WalletMenu() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute right-0 top-full z-50 mt-3 w-52 overflow-hidden rounded-xl border border-line bg-card shadow-card-lg">
+          <div role="menu" className="absolute right-0 top-full z-50 mt-3 w-52 overflow-hidden rounded-xl border border-line bg-card shadow-card-lg">
             <div className="border-b border-line px-4 py-3">
               <div className="text-[11px] uppercase tracking-[0.12em] text-faint">{t.app.nav.connected}</div>
               <div className="mt-1 flex items-center justify-between gap-2">
@@ -199,11 +226,13 @@ function WalletMenu() {
               </div>
             </div>
             <button
+              type="button"
+              role="menuitem"
               onClick={() => {
                 setOpen(false);
                 disconnect();
               }}
-              className="block w-full px-4 py-3 text-left text-[13px] text-orange transition-colors hover:bg-bg-2"
+              className="block w-full px-4 py-3 text-left text-[13px] text-orange transition-colors hover:bg-bg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               {t.app.nav.disconnect}
             </button>
