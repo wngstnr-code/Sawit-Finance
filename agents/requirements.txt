@@ -1,5 +1,5 @@
 aiohttp==3.14.1
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 pycspr==1.1.0
 google-generativeai==0.8.3
 # Pinned to <43 by pycspr 1.1.0 (Casper SDK); newer patched cryptography is not installable.
