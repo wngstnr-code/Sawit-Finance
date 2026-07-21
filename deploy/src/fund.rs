@@ -26,32 +26,55 @@ fn main() {
     let pool: U512 = U512::from(pool_motes);
 
     let env = odra_casper_livenet_env::env();
-    let deployer = env.get_account(0);
     println!("Authority account: loaded from deploy secret key");
 
     let mut dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());
     let cur = dist.get_current_epoch();
     println!("Current epoch before: {cur}");
 
-    let already_unfunded = matches!(dist.get_epoch(cur), Some(e) if !e.is_funded) && cur > 0;
-    let epoch_no = if already_unfunded {
-        println!("Reusing existing unfunded epoch #{cur}");
-        cur
-    } else {
-        println!("\nCreating distribution epoch '{epoch_label}'...");
-        env.set_gas(6_000_000_000);
-        dist.create_epoch(
-            epoch_label.clone(),
-            pool,
-            1,
-            trigger_cents,
-        );
-        let n = dist.get_current_epoch();
-        println!("Created epoch #{n}");
-        n
+    // An unfunded epoch may only be reused when its declared pool matches what this
+    // run is about to deposit. Reusing a mismatched one is what wedged epoch 4:
+    // depositing less than the declared pool leaves `is_funded` false — which blocks
+    // `claim_yield` and `sweep_unclaimed` alike — while depositing more reverts with
+    // OverfundsPool. Neither is recoverable from this binary, so refuse loudly and
+    // point at `resize_epoch` rather than compounding the problem.
+    let existing = if cur > 0 { dist.get_epoch(cur) } else { None };
+    let epoch_no = match existing {
+        Some(e) if !e.is_funded && e.total_distribution_cspr == pool => {
+            println!("Reusing existing unfunded epoch #{cur} (declared pool matches)");
+            cur
+        }
+        Some(e) if !e.is_funded => {
+            eprintln!(
+                "Epoch #{cur} is unfunded with a declared pool of {} motes, but this run \
+                 would deposit {pool_motes} motes.",
+                e.total_distribution_cspr
+            );
+            eprintln!(
+                "Refusing to reuse it: funding a mismatched pool either leaves the epoch \
+                 permanently unfunded (blocking claims and sweeps) or reverts with OverfundsPool."
+            );
+            eprintln!(
+                "Resize it to match first:  RESIZE_EPOCH={cur} RESIZE_POOL_MOTES={pool_motes} resize_epoch"
+            );
+            std::process::exit(4);
+        }
+        _ => {
+            println!("\nCreating distribution epoch '{epoch_label}'...");
+            env.set_gas(6_000_000_000);
+            dist.create_epoch(
+                epoch_label.clone(),
+                pool,
+                1,
+                trigger_cents,
+            );
+            let n = dist.get_current_epoch();
+            println!("Created epoch #{n}");
+            n
+        }
     };
 
-    println!("\nFunding epoch #{epoch_no} with 100 CSPR...");
+    println!("\nFunding epoch #{epoch_no} with {pool_motes} motes...");
     env.set_gas(25_000_000_000);
     dist.with_tokens(pool).fund_epoch(epoch_no);
 
