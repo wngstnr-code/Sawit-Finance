@@ -27,8 +27,18 @@ export const env = {
   assetName: process.env.ASSET_NAME || "SAWIT X402 Token",
   assetSymbol: process.env.ASSET_SYMBOL || "SAWITX",
   priceUnits: process.env.X402_PRICE_UNITS || "1000000000",
+  /** Facilitator's key: pays gas for settlement deploys. Holds CSPR, needs no SAWITX. */
   get secretKeyPath(): string {
     return process.env.X402_SECRET_KEY_PATH || required("ODRA_CASPER_LIVENET_SECRET_KEY_PATH");
+  },
+  /** Client/agent's key: the account whose SAWITX is actually spent. Must be kept distinct from
+   * secretKeyPath — pointing both at the facilitator's gas key leaves the payer with a zero token
+   * balance and settlement fails with `exact_casper_facilitator_settle_failed`. */
+  get clientSecretKeyPath(): string {
+    return (
+      process.env.X402_CLIENT_SECRET_KEY_PATH ||
+      required("ODRA_CASPER_LIVENET_SECRET_KEY_PATH")
+    );
   },
 };
 

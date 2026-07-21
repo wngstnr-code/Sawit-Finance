@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   const url = process.argv[2];
   if (!url) emit({ ok: false, error: "usage: tsx paid-fetch.ts <url>" }, 1);
 
-  const signer = await createClientCasperSigner(env.secretKeyPath, KeyAlgorithm.ED25519);
+  const signer = await createClientCasperSigner(env.clientSecretKeyPath, KeyAlgorithm.ED25519);
   const client = new x402Client().register("casper:*", new ExactCasperScheme(signer));
   const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 

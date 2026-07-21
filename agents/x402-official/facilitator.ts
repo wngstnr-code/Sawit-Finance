@@ -66,7 +66,10 @@ app.post("/settle", async (req, res) => {
       return res.status(400).json({ error: "Missing paymentPayload or paymentRequirements" });
     }
     const response: SettleResponse = await facilitator.settle(paymentPayload, paymentRequirements);
-    console.log(`settle → success=${response.success} tx=${response.transaction}`);
+    console.log(
+      `settle → success=${response.success} tx=${response.transaction}` +
+        (response.success ? "" : ` (${response.errorReason ?? "no errorReason"})`),
+    );
     res.json(response);
   } catch (error) {
     console.error("settle error:", error);

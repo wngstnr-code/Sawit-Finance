@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   console.log("Sawit Finance agent — paid CPO data fetch via official x402 protocol");
   console.log("=".repeat(64));
 
-  const signer = await createClientCasperSigner(env.secretKeyPath, KeyAlgorithm.ED25519);
+  const signer = await createClientCasperSigner(env.clientSecretKeyPath, KeyAlgorithm.ED25519);
   console.log(`payer  : ${signer.publicKey()} (account ${signer.accountAddress().slice(0, 18)}…)`);
   console.log(`asset  : ${env.assetSymbol} (CEP-18 ${env.assetPackage.slice(0, 16)}…)`);
   console.log(`target : ${url}\n`);

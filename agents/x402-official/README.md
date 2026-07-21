@@ -6,6 +6,9 @@ Agents pay per-request for gated CPO data over the **official Casper x402 protoc
 
 - Payment token: **SAWITX** — a CEP-18 with the `transfer_with_authorization` entry point, deployed for this integration: [`ace00b4d…`](https://testnet.cspr.live/contract-package/ace00b4d5e5e1fb52be4260e0aba9cbf2595992eb599519d6b596b9ff0ea1f2b)
 - Live settlement: [`1ea0a5f2…`](https://testnet.cspr.live/deploy/1ea0a5f2c4a03a282055ecb9e826108bb4ad3d04e8e5530d9baf856f27e490f3) — 402 challenge → EIP-712 authorization → on-chain settlement in ~15s, **zero gas paid by the agent** (the facilitator pays gas; the agent only spends SAWITX)
+- Oracle paying through the same rails (2026-07-21), one settlement per gated resource: [`59fbfc54…`](https://testnet.cspr.live/deploy/59fbfc54d9d93a39416f3086067257b2b4f3b4361387155f399adaab71352bf8) (`/api/kpbn/price`) and [`da5eef38…`](https://testnet.cspr.live/deploy/da5eef384c9b28ef5fb2f9ef6f4a8deb4e9f6b01fa6a63d7aeb68fb192f664d4) (`/api/mpob/benchmark`) — recorded in `agents/.oracle_provenance.json` as `x402_provenance: "official"`
+
+> The facilitator and the client must use **different keys** (see `.env.example`): the facilitator holds CSPR for gas, the client holds SAWITX. Budget ~4 CSPR of gas per settlement.
 
 ## Flow
 
