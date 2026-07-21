@@ -16,7 +16,7 @@ const en = {
     titleLeft: 'Real palm oil.',
     titleRight: 'Real yield.',
     subcopy:
-      'Real harvest, real revenue. Indonesian crude palm oil tokenized as SAWIT — on-chain yield in CSPR, anchored on official data feeds.',
+      'Real harvest, real revenue. Indonesian crude palm oil tokenized as SAWIT, with on-chain yield in CSPR, anchored on official data feeds.',
     scroll: 'Scroll to explore ↓',
     marqueeLabel: 'Data sources & stack',
   },
@@ -45,7 +45,7 @@ const en = {
       },
       {
         title: 'Mint SAWIT',
-        body: 'SawitVault records the verified epoch and the TokenMinter atomically mints the SAWIT Casper asset from it — cryptographically tied to real production.',
+        body: 'SawitVault records the verified epoch and the TokenMinter atomically mints the SAWIT Casper asset from it, cryptographically tied to real production.',
       },
       {
         title: 'Fund yield',
@@ -53,14 +53,14 @@ const en = {
       },
       {
         title: 'Claim CSPR',
-        body: 'KYC-authorized holders claim their pro-rata CSPR yield. Compliance is enforced cross-contract — SawitYield checks KYC against the Vault.',
+        body: 'KYC-authorized holders claim their pro-rata CSPR yield. Compliance is enforced cross-contract: SawitYield checks KYC against the Vault.',
       },
     ],
   },
   rwa: {
     eyebrow: 'Real-world asset',
     title: "Indonesia's largest crude palm oil supply, brought on-chain.",
-    cardDesc: 'Tokenized CPO revenue on Casper — real harvest, on-chain, settled in CSPR.',
+    cardDesc: 'Tokenized CPO revenue on Casper: real harvest, on-chain, settled in CSPR.',
     live: 'Live on Casper Testnet',
     launch: 'Launch App →',
     verifiedValue: 'Verified CPO value',
@@ -73,9 +73,9 @@ const en = {
     ratings: { excellent: 'Excellent', good: 'Good', review: 'Review' },
     mintedLabel: 'SAWIT minted',
     sawitDesc:
-      'A fractional, yield-bearing claim on verified Indonesian CPO revenue — freely tradable via the treasury.',
+      'A fractional, yield-bearing claim on verified Indonesian CPO revenue, freely tradable via the treasury.',
     csprDesc:
-      'CPO revenue is funded as CSPR each epoch — holders claim their pro-rata share, set on-chain by the settlement keeper.',
+      'CPO revenue is funded as CSPR each epoch. Holders claim their pro-rata share, set on-chain by the settlement keeper.',
     sawitCta: 'Buy SAWIT →',
     csprCta: 'Claim yield →',
     fvLabel: 'SAWIT fair value',
@@ -95,14 +95,14 @@ const en = {
     titlePre: 'We believe in ',
     titleHighlight: 'verifiable yield',
     subcopy:
-      "Every token traces back to a real harvest, a real mill, and a real payout — across Indonesia's palm oil belt, from Sumatra to Kalimantan. No synthetics, no black boxes. Just production you can audit on-chain.",
+      "Every token traces back to a real harvest, a real mill, and a real payout, across Indonesia's palm oil belt, from Sumatra to Kalimantan. No synthetics, no black boxes. Just production you can audit on-chain.",
     loading: 'Loading map…',
   },
   tech: {
     eyebrow: 'Data integrity',
     title: 'An oracle that rejects bad data.',
     subcopy:
-      'The data is the moat. A deterministic gate plus AI reasoning cross-checks GAPKI, KPBN, and MPOB — and vetoes anomalies before they ever reach the chain.',
+      'The data is the moat. A deterministic gate plus AI reasoning cross-checks GAPKI, KPBN, and MPOB, vetoing anomalies before they ever reach the chain.',
     agents: [
       {
         role: 'Verifies production',
@@ -112,7 +112,7 @@ const en = {
       {
         role: 'Rejects bad data',
         name: 'Gemini Gate',
-        body: 'An AI reasoning gate vetoes anomalies — a suspicious price spike or divergence — before the epoch is ever recorded on-chain. AI guards data trust.',
+        body: 'An AI reasoning gate vetoes anomalies (a suspicious price spike or divergence) before the epoch is ever recorded on-chain. AI guards data trust.',
       },
       {
         role: 'Closes the loop',
@@ -126,13 +126,13 @@ const en = {
     eyebrow: 'Proof, on-chain',
     title: 'The full economic loop, already executed.',
     subcopy:
-      'Not a mockup — real transactions on Casper Testnet. Tap a step to inspect it, then verify the hash on the explorer.',
+      'Not a mockup. These are real transactions on Casper Testnet. Tap a step to inspect it, then verify the hash on the explorer.',
     pending: 'pending',
     step: 'step',
     steps: {
       record_production: {
         title: 'Record production',
-        desc: 'AI oracle records a verified CPO epoch — 45,200 t @ $825, reputation 92/100.',
+        desc: 'AI oracle records a verified CPO epoch: 45,200 t @ $825, reputation 92/100.',
       },
       mint_epoch: {
         title: 'Mint SAWIT',
@@ -140,15 +140,15 @@ const en = {
       },
       fund_epoch: {
         title: 'Fund yield',
-        desc: 'A distribution epoch is created and funded with 100 CSPR (payable) — a 90-day claim window opens.',
+        desc: 'A distribution epoch is created and funded with 100 CSPR (payable), and a 90-day claim window opens.',
       },
       claim_yield: {
         title: 'Claim CSPR',
-        desc: 'A KYC-verified holder claims yield — CSPR transferred, gated by a CPI to the vault.',
+        desc: 'A KYC-verified holder claims yield: CSPR transferred, gated by a CPI to the vault.',
       },
       transfer_with_authorization: {
         title: 'Agent pays via x402',
-        desc: 'The oracle pays for gated CPO data over the official Casper x402 protocol — 402 challenge, signed EIP-712 authorization, settled on-chain as a CEP-18 transfer_with_authorization in SAWITX. Gasless for the agent; the facilitator pays gas.',
+        desc: 'The oracle pays for gated CPO data over the official Casper x402 protocol: a 402 challenge, a signed EIP-712 authorization, settled on-chain as a CEP-18 transfer_with_authorization in SAWITX. Gasless for the agent; the facilitator pays gas.',
       },
     },
   },
@@ -157,14 +157,14 @@ const en = {
     titleLine1: 'Where raw harvest becomes',
     titleLine2: 'on-chain value.',
     subcopy:
-      "Indonesia's palm oil backbone, made programmable — production, minting, and CSPR yield, all on Casper.",
+      "Indonesia's palm oil backbone, made programmable: production, minting, and CSPR yield, all on Casper.",
     tagline: 'Dari kebun jadi yield.',
   },
   access: {
     eyebrow: 'For investors',
     title: 'Verified to hold, free to trade.',
     subcopyBefore:
-      'SAWIT is a permissioned real-world asset. The vault authorizes your account after KYC — native Casper ',
+      'SAWIT is a permissioned real-world asset. The vault authorizes your account after KYC, using native Casper ',
     subcopyAfter:
       ', no custom registry. Once authorized, you hold SAWIT, claim CSPR yield, and trade it freely via the treasury.',
     cta: 'Open the app →',
@@ -174,35 +174,35 @@ const en = {
     eyebrow: 'FAQ',
     title: 'Questions, answered honestly.',
     subcopy:
-      'The short version of how Sawit Finance works — and, just as important, what it is not.',
+      'The short version of how Sawit Finance works, and just as important, what it is not.',
     items: [
       {
         q: 'What exactly is SAWIT?',
-        a: 'A fractional, yield-bearing claim on verified Indonesian crude palm oil production revenue, structured like a plantation royalty. It is a real Casper asset — not a synthetic, not a CPO price tracker, and not a claim on physical palm oil.',
+        a: 'A fractional, yield-bearing claim on verified Indonesian crude palm oil production revenue, structured like a plantation royalty. It is a real Casper asset, not a synthetic, not a CPO price tracker, and not a claim on physical palm oil.',
       },
       {
         q: 'What is an epoch?',
-        a: 'One production settlement period — roughly a month, following how official CPO data is published. Each epoch, verified production is recorded and SAWIT is minted atomically, revenue is computed and funded in CSPR, and holders claim their pro-rata share. Like real plantation royalties, it settles in arrears, once the period’s data is final.',
+        a: 'One production settlement period of roughly a month, following how official CPO data is published. Each epoch, verified production is recorded and SAWIT is minted atomically, revenue is computed and funded in CSPR, and holders claim their pro-rata share. Like real plantation royalties, it settles in arrears, once the period’s data is final.',
       },
       {
         q: 'Where does the yield come from?',
-        a: 'Each epoch pays tons produced × the official reference price × the on-chain royalty rate (GORR), in CSPR. On testnet the payout is funded from the project treasury — the amount is computed from audited public production data, and a signed royalty agreement is the mainnet step.',
+        a: 'Each epoch pays tons produced × the official reference price × the on-chain royalty rate (GORR), in CSPR. On testnet the payout is funded from the project treasury. The amount is computed from audited public production data, and a signed royalty agreement is the mainnet step.',
       },
       {
         q: 'Is the yield guaranteed?',
-        a: 'No — and that honesty is the point. Yield is computed from actual production and the official reference price each period, so if CPO prices fall or output drops, the payout shrinks with them. This is a claim on real commodity revenue, not a fixed-income product.',
+        a: 'No, and that honesty is the point. Yield is computed from actual production and the official reference price each period, so if CPO prices fall or output drops, the payout shrinks with them. This is a claim on real commodity revenue, not a fixed-income product.',
       },
       {
         q: 'How do I know the data is real?',
-        a: 'Prices come from a global reference feed (FRED/IMF) and Indonesia’s industry references (GAPKI/KPBN); production comes from cross-validated, published industry filings (GAPKI/KPBN/MPOB). Every epoch passes cross-validation, a deterministic plausibility gate, and an AI reasoning gate before it can reach the chain — and SAWIT is minted atomically from the verified record.',
+        a: 'Prices come from a global reference feed (FRED/IMF) and Indonesia’s industry references (GAPKI/KPBN); production comes from cross-validated, published industry filings (GAPKI/KPBN/MPOB). Every epoch passes cross-validation, a deterministic plausibility gate, and an AI reasoning gate before it can reach the chain, and SAWIT is minted atomically from the verified record.',
       },
       {
         q: 'Who runs the system day to day?',
-        a: 'Autonomous agents on a public GitHub Actions schedule — no manual operation. An oracle agent validates official data and records each epoch monthly, when the source data is published; a settlement keeper computes royalties, funds each epoch, and sweeps expired claims periodically. The only human step is KYC approval, and that is deliberate.',
+        a: 'Autonomous agents on a public GitHub Actions schedule, with no manual operation. An oracle agent validates official data and records each epoch monthly, when the source data is published; a settlement keeper computes royalties, funds each epoch, and sweeps expired claims periodically. The only human step is KYC approval, and that is deliberate.',
       },
       {
         q: 'How is this different from gold tokens like PAXG?',
-        a: 'Gold tokens are asset-backed: one token equals metal sitting in a vault. SAWIT is revenue-sharing: it pays a periodic CSPR share of production revenue — closer to a royalty than to owning the commodity itself, so yield moves with production and price.',
+        a: 'Gold tokens are asset-backed: one token equals metal sitting in a vault. SAWIT is revenue-sharing: it pays a periodic CSPR share of production revenue, closer to a royalty than to owning the commodity itself, so yield moves with production and price.',
       },
       {
         q: 'Why does this need a blockchain?',
@@ -210,19 +210,19 @@ const en = {
       },
       {
         q: 'Can I sell my SAWIT?',
-        a: 'Yes. Once your account is KYC-authorized, SAWIT is freely tradable via the treasury sale flow. KYC gates holding and claiming — it is not a lock-up.',
+        a: 'Yes. Once your account is KYC-authorized, SAWIT is freely tradable via the treasury sale flow. KYC gates holding and claiming. It is not a lock-up.',
       },
       {
         q: 'How often does the SAWIT price update?',
-        a: 'The treasury price is fixed per sale round and repriced periodically by the keeper: average funded revenue over the last three epochs ÷ total supply × a 60-month payback. The anchor price tracks real production revenue — not an operator’s manual setting.',
+        a: 'The treasury price is fixed per sale round and repriced periodically by the keeper: average funded revenue over the last three epochs ÷ total supply × a 60-month payback. The anchor price tracks real production revenue, not an operator’s manual setting.',
       },
       {
         q: 'What do I need to try it?',
-        a: 'Just a Casper wallet like CSPR.click (Casper Wallet, Ledger). On testnet the app funds a fresh wallet with CSPR from the faucet, and a self-service demo KYC unlocks the full journey — buy SAWIT, claim CSPR yield, and withdraw to fiat via a v2 roadmap off-ramp.',
+        a: 'Just a Casper wallet like CSPR.click (Casper Wallet, Ledger). On testnet the app funds a fresh wallet with CSPR from the faucet, and a self-service demo KYC unlocks the full journey: buy SAWIT, claim CSPR yield, and withdraw to fiat via a v2 roadmap off-ramp.',
       },
       {
         q: 'Is this a live investment product?',
-        a: 'No. Sawit Finance runs on Casper Testnet as a hackathon MVP — nothing here is an offer of securities or investment advice. The contracts are open source with verified reproducible builds on the Casper explorer, so you can audit exactly what they do.',
+        a: 'No. Sawit Finance runs on Casper Testnet as a hackathon MVP. Nothing here is an offer of securities or investment advice. The contracts are open source with verified reproducible builds on the Casper explorer, so you can audit exactly what they do.',
       },
     ],
   },
@@ -253,7 +253,7 @@ const en = {
       connected: 'Connected',
       disconnect: 'Disconnect',
       backToSite: 'Back to site',
-      snapshotBadge: 'Snapshot data — live chain read unavailable',
+      snapshotBadge: 'Snapshot data · live chain read unavailable',
     },
     explore: {
       title: 'Explore',
@@ -277,25 +277,25 @@ const en = {
       enterAmount: 'Enter amount',
       chartTitle: 'CPO price history',
       chartEyebrow: 'Market · FRED',
-      chartFooter: 'FRED PPOILUSDM (IMF) — the same feed the oracle uses to value each epoch.',
+      chartFooter: 'FRED PPOILUSDM (IMF), the same feed the oracle uses to value each epoch.',
       sawitPriceLabel: 'SAWIT price',
       fvTitle: 'SAWIT fair value',
       fvEyebrow: 'Price · derived on-chain',
       fvFooter:
-        'Fair value per epoch = avg CSPR actually distributed (last 3 epochs) ÷ SAWIT supply × 60-month payback — the same formula the keeper uses to reprice the treasury offer. Price follows real cash flow, not an operator peg.',
+        'Fair value per epoch = avg CSPR actually distributed (last 3 epochs) ÷ SAWIT supply × 60-month payback, the same formula the keeper uses to reprice the treasury offer. Price follows real cash flow, not an operator peg.',
       fvPerSawit: 'CSPR per SAWIT',
       acquire: 'Acquire · Treasury',
       buySawit: 'Buy SAWIT',
       buyDesc:
-        'Send CSPR to the treasury — the allocation agent delivers SAWIT on-chain.',
+        'Send CSPR to the treasury and the allocation agent delivers SAWIT on-chain.',
       youSpend: 'You spend',
       estOut: '≈ {amount} SAWIT at the fixed treasury price',
       estOutNote:
-        'Processed by the allocation agent — SAWIT arrives after on-chain confirmation, typically 1–2 minutes, not an instant swap.',
+        'Processed by the allocation agent. SAWIT arrives after on-chain confirmation, typically 1–2 minutes, not an instant swap.',
       verifyToBuy: 'Verify KYC to buy',
       provenance: 'Provenance',
       provenanceNote:
-        "Source: GAPKI CPO production data (2026 guidance), epoch tagged to Sumatra plantation clusters — priced from the FRED/IMF palm oil feed and cross-validated against KPBN and MPOB. Single-region feed in this MVP; extensible to more sites and operators.",
+        "Source: GAPKI CPO production data (2026 guidance), epoch tagged to Sumatra plantation clusters, priced from the FRED/IMF palm oil feed and cross-validated against KPBN and MPOB. Single-region feed in this MVP; extensible to more sites and operators.",
     },
     portfolio: {
       title: 'Portfolio',
@@ -304,11 +304,11 @@ const en = {
       ofSupply: '{pct}% of {supply} supply',
       chartTitle: 'Portfolio value over epochs',
       chartFooter:
-        'Your current holdings: SAWIT marked at each epoch’s on-chain fair value (avg distributed CSPR ÷ supply × 60-month payback — the keeper’s treasury pricing formula) plus your CSPR balance at par.',
+        'Your current holdings: SAWIT marked at each epoch’s on-chain fair value (avg distributed CSPR ÷ supply × 60-month payback, the keeper’s treasury pricing formula) plus your CSPR balance at par.',
       allocEyebrow: 'Holdings · live',
       allocTitle: 'Asset allocation',
       allocTotal: 'Total',
-      allocEmpty: 'No priced assets yet — buy SAWIT to start.',
+      allocEmpty: 'No priced assets yet. Buy SAWIT to start.',
       liquidWallet: 'Liquid wallet',
       claimableYield: 'Yield',
       readyToClaim: 'Ready to claim',
@@ -331,7 +331,7 @@ const en = {
       title: 'Claim Yield',
       intro: [
         'SAWIT is yield-bearing. Each funded epoch distributes CSPR to holders pro-rata, fixed by a claimable-balance snapshot set on-chain by the settlement keeper.',
-        'Your entitlement is verified against the epoch record and your KYC status when you claim — no custodian, settled straight to your wallet in CSPR.',
+        'Your entitlement is verified against the epoch record and your KYC status when you claim. There is no custodian; it settles straight to your wallet in CSPR.',
         'You can claim once per epoch. New yield opens with the next distribution.',
       ],
       epoch: 'Epoch',
@@ -354,10 +354,10 @@ const en = {
       verified: 'Verified',
       allSet: "You're all set",
       allSetText:
-        'Your on-chain KYC is verified — you can buy SAWIT and claim CSPR yield.',
+        'Your on-chain KYC is verified. You can buy SAWIT and claim CSPR yield.',
       exploreSawit: 'Explore SAWIT',
       claimYield: 'Claim yield',
-      pendingSub: 'Application received — awaiting vault verification.',
+      pendingSub: 'Application received, awaiting vault verification.',
       pendingReview: 'Pending review',
       underReview: 'Application under review',
       underReviewText1: 'Your application for',
@@ -365,13 +365,13 @@ const en = {
         'has been sent. The vault authority will verify your KYC flag on-chain once your details are checked.',
       autoUpdate: 'This updates automatically once the vault authorizes your account.',
       intro: [
-        'SAWIT is a permissioned real-world asset. Only KYC-verified accounts can hold it or claim yield — enforced natively by the production vault, not a custom off-chain gate.',
+        'SAWIT is a permissioned real-world asset. Only KYC-verified accounts can hold it or claim yield, enforced natively by the production vault, not a custom off-chain gate.',
         'Register below with your details. The vault authority reviews your application and verifies your account on-chain.',
       ],
       fullName: 'Full name',
       email: 'Email',
       casperWallet: 'Casper wallet (public key)',
-      walletPlaceholder: '— connect your wallet —',
+      walletPlaceholder: 'connect your wallet…',
       walletNote:
         'Auto-filled from your connected wallet. The vault authorizes exactly this account.',
       allocation: 'Intended allocation (USD)',
@@ -383,7 +383,7 @@ const en = {
       submit: 'Submit application',
       footNoteConnected: 'KYC-gated · the vault authorizes your SAWIT account',
       footNoteDisconnected:
-        'Connect your wallet first — it fills your Casper account automatically',
+        'Connect your wallet first; it fills your Casper account automatically',
       contracts: 'Contracts',
       sawitIssuer: 'SAWIT vault authority',
       status: 'Status',
@@ -418,7 +418,7 @@ const en = {
         'On mainnet the vault authority reviews every application by hand. On this testnet demo you can skip the queue: your KYC flag is registered and verified automatically so you can try the full flow end-to-end.',
       kycCta: 'Verify instantly',
       kycFunding: 'Funding account (Casper testnet faucet)…',
-      kycRegister: 'Registering KYC on-chain — sign in your wallet…',
+      kycRegister: 'Registering KYC on-chain. Sign in your wallet…',
       kycAuthorizing: 'Vault authority verifying KYC…',
       csprTitle: 'Need testnet CSPR?',
       csprNote: 'Funded from the Casper testnet faucet.',
@@ -433,7 +433,7 @@ const en = {
       body: 'Send claimed CSPR to fiat through a licensed off-ramp partner: wallet verification, then the partner’s hosted withdrawal flow.',
       cta: 'Withdraw via partner',
       resolving: 'Resolving off-ramp partner…',
-      auth: 'Authenticating — sign in your wallet…',
+      auth: 'Authenticating. Sign in your wallet…',
       starting: 'Starting interactive withdraw…',
       form: 'Complete the partner’s form in the popup…',
       reopenForm: 'Reopen partner form',
@@ -468,18 +468,18 @@ const en = {
       scoreShort: 'Score',
       latestTag: 'Latest',
       loadingEpochs: 'Loading epochs…',
-      kycAuthorized: 'KYC authorized — your SAWIT account is active',
+      kycAuthorized: 'KYC authorized · your SAWIT account is active',
       kycPending: 'KYC pending vault verification',
       noKyc: 'No KYC verification yet',
       authRequiredNote:
-        'Native on-chain KYC — only verified accounts can hold SAWIT or claim yield.',
+        'Native on-chain KYC: only verified accounts can hold SAWIT or claim yield.',
       requestAccess: 'Request access',
       readMore: 'Read more',
       cpo5yr: '5-yr CPO',
     },
     agents: {
       title: 'Agent Control Room',
-      sub: 'The autonomous crew running this plantation ledger — reading the chain, reasoning over real CPO data, and writing their own decisions back on-chain. Rule-based work is labelled exactly that; nothing here pretends to be smarter than it is.',
+      sub: 'The autonomous crew running this plantation ledger, reading the chain, reasoning over real CPO data, and writing their own decisions back on-chain. Rule-based work is labelled exactly that; nothing here pretends to be smarter than it is.',
       statusActive: 'Active',
       statusIdle: 'Idle',
       kindLlm: 'LLM-driven',
@@ -491,28 +491,28 @@ const en = {
       guardrailsLabel: 'Guardrails',
       viewTx: 'View tx ↗',
       lastKnownTag: 'last known · example run',
-      idleHint: 'Idle on this machine — start it with',
+      idleHint: 'Idle on this machine. Start it with',
       provenanceLabel: 'Data provenance',
-      paidOfficial: 'Paid via x402 — official protocol',
-      paidReference: 'Paid via x402 — reference client',
-      unpaidFallback: 'Unpaid — representative fallback used',
+      paidOfficial: 'Paid via x402 · official protocol',
+      paidReference: 'Paid via x402 · reference client',
+      unpaidFallback: 'Unpaid · representative fallback used',
       provenanceUnknown: 'No x402 fetch recorded yet on this machine',
       feedTitle: 'Autonomy feed',
-      feedEmpty: 'No agent has written on-chain from this machine yet — the cards above still carry each agent’s last known example run.',
+      feedEmpty: 'No agent has written on-chain from this machine yet. The cards above still carry each agent’s last known example run.',
       mcpTitle: 'MCP tool surface',
-      mcpBody: '{n} live, read-only tools exposed over MCP so any compatible LLM client can query protocol state directly — no custody, no write access.',
+      mcpBody: '{n} live, read-only tools exposed over MCP so any compatible LLM client can query protocol state directly, with no custody and no write access.',
       x402Title: 'x402 micropayments',
-      x402Body: 'Agents pay per request for gated CPO data over the Casper x402 protocol, settled in SAWITX — gasless for the agent, the facilitator covers gas.',
+      x402Body: 'Agents pay per request for gated CPO data over the Casper x402 protocol, settled in SAWITX. Gasless for the agent, and the facilitator covers gas.',
       onchainSnapshotTitle: 'Live from the chain',
       onchainGorr: 'GORR',
       onchainOracleRep: 'Oracle reputation',
       onchainEpochs: 'Epochs recorded',
       onchainPrice: 'Latest CPO price',
-      snapshotNote: 'Snapshot data — figures may lag the live chain.',
+      snapshotNote: 'Snapshot data. Figures may lag the live chain.',
       oracleTagline: 'Prices the harvest before it ever touches the ledger.',
       marketAnalystTagline: 'Closes the loop: reads the vault, reasons with Gemini, writes GORR back on-chain.',
-      allocationTagline: 'Turns a treasury deposit into SAWIT, deterministically — with an LLM tripwire for anomalies.',
-      yieldRouterTagline: 'The keeper that actually pays out — rule-based, no LLM in the hot path.',
+      allocationTagline: 'Turns a treasury deposit into SAWIT, deterministically, with an LLM tripwire for anomalies.',
+      yieldRouterTagline: 'The keeper that actually pays out: rule-based, no LLM in the hot path.',
     },
   },
   footer: {
@@ -670,7 +670,7 @@ const id: LocaleDict = {
     steps: {
       record_production: {
         title: 'Catat produksi',
-        desc: 'Oracle AI mencatat epoch CPO terverifikasi — 45.200 t @ $825, reputasi 92/100.',
+        desc: 'Oracle AI mencatat epoch CPO terverifikasi: 45.200 t @ $825, reputasi 92/100.',
       },
       mint_epoch: {
         title: 'Mint SAWIT',
@@ -678,15 +678,15 @@ const id: LocaleDict = {
       },
       fund_epoch: {
         title: 'Danai yield',
-        desc: 'Epoch distribusi dibuat dan didanai 100 CSPR (payable) — jendela klaim 90 hari dibuka.',
+        desc: 'Epoch distribusi dibuat dan didanai 100 CSPR (payable), lalu jendela klaim 90 hari dibuka.',
       },
       claim_yield: {
         title: 'Klaim CSPR',
-        desc: 'Holder terverifikasi KYC mengklaim yield — CSPR ditransfer, dijaga CPI ke vault.',
+        desc: 'Holder terverifikasi KYC mengklaim yield: CSPR ditransfer, dijaga CPI ke vault.',
       },
       transfer_with_authorization: {
         title: 'Agent membayar via x402',
-        desc: 'Oracle membayar data CPO berbayar lewat protokol resmi Casper x402 — tantangan 402, otorisasi EIP-712 bertanda tangan, diselesaikan on-chain sebagai transfer_with_authorization CEP-18 dalam SAWITX. Tanpa gas bagi agent; facilitator yang membayar gas.',
+        desc: 'Oracle membayar data CPO berbayar lewat protokol resmi Casper x402: tantangan 402, otorisasi EIP-712 bertanda tangan, diselesaikan on-chain sebagai transfer_with_authorization CEP-18 dalam SAWITX. Tanpa gas bagi agent; facilitator yang membayar gas.',
       },
     },
   },
@@ -712,35 +712,35 @@ const id: LocaleDict = {
     eyebrow: 'FAQ',
     title: 'Pertanyaan yang sering muncul, dijawab jujur.',
     subcopy:
-      'Versi singkat cara kerja Sawit Finance — dan, sama pentingnya, apa yang bukan Sawit Finance.',
+      'Versi singkat cara kerja Sawit Finance, dan yang sama pentingnya, apa yang bukan Sawit Finance.',
     items: [
       {
         q: 'Sebenarnya SAWIT itu apa?',
-        a: 'Klaim fraksional yang menghasilkan yield atas revenue produksi CPO Indonesia yang terverifikasi, distrukturkan seperti royalti kebun. SAWIT adalah aset Casper sungguhan — bukan sintetis, bukan pelacak harga CPO, dan bukan klaim atas minyak sawit fisik.',
+        a: 'Klaim fraksional yang menghasilkan yield atas revenue produksi CPO Indonesia yang terverifikasi, distrukturkan seperti royalti kebun. SAWIT adalah aset Casper sungguhan, bukan sintetis, bukan pelacak harga CPO, dan bukan klaim atas minyak sawit fisik.',
       },
       {
         q: 'Epoch itu apa?',
-        a: 'Satu periode penyelesaian produksi — kurang lebih sebulan, mengikuti terbitnya data CPO resmi. Tiap epoch, produksi terverifikasi dicatat dan SAWIT dimint secara atomik, revenue dihitung dan didanai dalam CSPR, lalu holder mengklaim bagian pro-rata-nya. Seperti royalti kebun sungguhan, penyelesaiannya di belakang, setelah data periode itu final.',
+        a: 'Satu periode penyelesaian produksi, kurang lebih sebulan, mengikuti terbitnya data CPO resmi. Tiap epoch, produksi terverifikasi dicatat dan SAWIT dimint secara atomik, revenue dihitung dan didanai dalam CSPR, lalu holder mengklaim bagian pro-rata-nya. Seperti royalti kebun sungguhan, penyelesaiannya di belakang, setelah data periode itu final.',
       },
       {
         q: 'Yield-nya berasal dari mana?',
-        a: 'Tiap epoch membayar tonase produksi × harga acuan resmi × tarif royalti on-chain (GORR), dalam CSPR. Di testnet pembayarannya didanai treasury project — jumlahnya dihitung dari data produksi publik yang teraudit, dan perjanjian royalti resmi adalah langkah menuju mainnet.',
+        a: 'Tiap epoch membayar tonase produksi × harga acuan resmi × tarif royalti on-chain (GORR), dalam CSPR. Di testnet pembayarannya didanai treasury project. Jumlahnya dihitung dari data produksi publik yang teraudit, dan perjanjian royalti resmi adalah langkah menuju mainnet.',
       },
       {
         q: 'Apakah yield-nya dijamin?',
-        a: 'Tidak — dan kejujuran itu justru intinya. Yield dihitung dari produksi aktual dan harga acuan resmi tiap periode, jadi kalau harga CPO turun atau produksi menyusut, pembayarannya ikut mengecil. Ini klaim atas revenue komoditas nyata, bukan produk pendapatan tetap.',
+        a: 'Tidak, dan kejujuran itu justru intinya. Yield dihitung dari produksi aktual dan harga acuan resmi tiap periode, jadi kalau harga CPO turun atau produksi menyusut, pembayarannya ikut mengecil. Ini klaim atas revenue komoditas nyata, bukan produk pendapatan tetap.',
       },
       {
         q: 'Dari mana saya tahu datanya benar?',
-        a: 'Harga berasal dari feed acuan global (FRED/IMF) dan acuan industri Indonesia (GAPKI/KPBN); produksi divalidasi silang dari laporan industri yang dipublikasikan (GAPKI/KPBN/MPOB). Setiap epoch melewati cross-validation, gerbang kewajaran deterministik, dan gerbang penalaran AI sebelum bisa menyentuh chain — dan SAWIT dimint secara atomik dari catatan terverifikasi itu.',
+        a: 'Harga berasal dari feed acuan global (FRED/IMF) dan acuan industri Indonesia (GAPKI/KPBN); produksi divalidasi silang dari laporan industri yang dipublikasikan (GAPKI/KPBN/MPOB). Setiap epoch melewati cross-validation, gerbang kewajaran deterministik, dan gerbang penalaran AI sebelum bisa menyentuh chain, dan SAWIT dimint secara atomik dari catatan terverifikasi itu.',
       },
       {
         q: 'Siapa yang menjalankan sistemnya sehari-hari?',
-        a: 'Agen-agen otonom pada jadwal GitHub Actions yang publik — tanpa operasi manual. Oracle agent memvalidasi data resmi dan mencatat tiap epoch secara bulanan, mengikuti terbitnya data sumber; settlement keeper menghitung royalti, mendanai tiap epoch, dan menyapu klaim kedaluwarsa secara berkala. Satu-satunya langkah manusia adalah persetujuan KYC, dan itu memang disengaja.',
+        a: 'Agen-agen otonom pada jadwal GitHub Actions yang publik, tanpa operasi manual. Oracle agent memvalidasi data resmi dan mencatat tiap epoch secara bulanan, mengikuti terbitnya data sumber; settlement keeper menghitung royalti, mendanai tiap epoch, dan menyapu klaim kedaluwarsa secara berkala. Satu-satunya langkah manusia adalah persetujuan KYC, dan itu memang disengaja.',
       },
       {
         q: 'Apa bedanya dengan token emas seperti PAXG?',
-        a: 'Token emas itu asset-backed: satu token setara logam yang tersimpan di brankas. SAWIT itu revenue-sharing: membayar bagian CSPR dari revenue produksi secara berkala — lebih mirip royalti daripada memiliki komoditasnya, jadi yield ikut naik-turun bersama produksi dan harga.',
+        a: 'Token emas itu asset-backed: satu token setara logam yang tersimpan di brankas. SAWIT itu revenue-sharing: membayar bagian CSPR dari revenue produksi secara berkala, lebih mirip royalti daripada memiliki komoditasnya, jadi yield ikut naik-turun bersama produksi dan harga.',
       },
       {
         q: 'Kenapa harus pakai blockchain?',
@@ -748,19 +748,19 @@ const id: LocaleDict = {
       },
       {
         q: 'SAWIT saya bisa dijual lagi?',
-        a: 'Bisa. Setelah akunmu terverifikasi KYC, SAWIT bebas diperdagangkan lewat alur penjualan treasury. KYC hanya menggerbangi memegang dan mengklaim — bukan lock-up.',
+        a: 'Bisa. Setelah akunmu terverifikasi KYC, SAWIT bebas diperdagangkan lewat alur penjualan treasury. KYC hanya menggerbangi memegang dan mengklaim, bukan lock-up.',
       },
       {
         q: 'Seberapa sering harga SAWIT diperbarui?',
-        a: 'Harga treasury tetap per putaran penjualan dan di-reprice secara berkala oleh keeper: rata-rata revenue terdanai tiga epoch terakhir ÷ total supply × payback 60 bulan. Harga jangkarnya mengikuti revenue produksi nyata — bukan setelan manual operator.',
+        a: 'Harga treasury tetap per putaran penjualan dan di-reprice secara berkala oleh keeper: rata-rata revenue terdanai tiga epoch terakhir ÷ total supply × payback 60 bulan. Harga jangkarnya mengikuti revenue produksi nyata, bukan setelan manual operator.',
       },
       {
         q: 'Apa yang saya butuhkan untuk mencoba?',
-        a: 'Cukup wallet Casper seperti CSPR.click (Casper Wallet, Ledger). Di testnet, aplikasi mendanai wallet baru dengan CSPR dari faucet, dan demo KYC self-service membuka perjalanan lengkapnya — beli SAWIT, klaim yield CSPR, sampai tarik ke fiat lewat off-ramp yang masih di roadmap v2.',
+        a: 'Cukup wallet Casper seperti CSPR.click (Casper Wallet, Ledger). Di testnet, aplikasi mendanai wallet baru dengan CSPR dari faucet, dan demo KYC self-service membuka perjalanan lengkapnya: beli SAWIT, klaim yield CSPR, sampai tarik ke fiat lewat off-ramp yang masih di roadmap v2.',
       },
       {
         q: 'Ini sudah jadi produk investasi?',
-        a: 'Belum. Sawit Finance berjalan di Casper Testnet sebagai MVP hackathon — tidak ada apa pun di sini yang merupakan penawaran efek atau saran investasi. Kontraknya open source dengan build tereproduksi yang terverifikasi di explorer Casper, jadi kamu bisa mengaudit persis apa yang dilakukannya.',
+        a: 'Belum. Sawit Finance berjalan di Casper Testnet sebagai MVP hackathon. Tidak ada apa pun di sini yang merupakan penawaran efek atau saran investasi. Kontraknya open source dengan build tereproduksi yang terverifikasi di explorer Casper, jadi kamu bisa mengaudit persis apa yang dilakukannya.',
       },
     ],
   },
@@ -791,7 +791,7 @@ const id: LocaleDict = {
       connected: 'Terhubung',
       disconnect: 'Putuskan',
       backToSite: 'Kembali ke situs',
-      snapshotBadge: 'Data snapshot — pembacaan chain langsung tidak tersedia',
+      snapshotBadge: 'Data snapshot · pembacaan chain langsung tidak tersedia',
     },
     explore: {
       title: 'Jelajahi',
@@ -825,11 +825,11 @@ const id: LocaleDict = {
       acquire: 'Beli · Treasury',
       buySawit: 'Beli SAWIT',
       buyDesc:
-        'Kirim CSPR ke treasury — allocation agent mengantarkan SAWIT on-chain.',
+        'Kirim CSPR ke treasury, lalu allocation agent mengantarkan SAWIT on-chain.',
       youSpend: 'Kamu keluarkan',
       estOut: '≈ {amount} SAWIT pada harga treasury tetap',
       estOutNote:
-        'Diproses oleh allocation agent — SAWIT tiba setelah konfirmasi on-chain, biasanya 1–2 menit, bukan swap instan.',
+        'Diproses oleh allocation agent. SAWIT tiba setelah konfirmasi on-chain, biasanya 1–2 menit, bukan swap instan.',
       verifyToBuy: 'Verifikasi KYC untuk beli',
       provenance: 'Provenans',
       provenanceNote:
@@ -846,7 +846,7 @@ const id: LocaleDict = {
       allocEyebrow: 'Kepemilikan · live',
       allocTitle: 'Alokasi aset',
       allocTotal: 'Total',
-      allocEmpty: 'Belum ada aset bernilai — beli SAWIT untuk memulai.',
+      allocEmpty: 'Belum ada aset bernilai. Beli SAWIT untuk memulai.',
       liquidWallet: 'Saldo likuid',
       claimableYield: 'Yield',
       readyToClaim: 'Siap di-claim',
@@ -909,7 +909,7 @@ const id: LocaleDict = {
       fullName: 'Nama lengkap',
       email: 'Email',
       casperWallet: 'Wallet Casper (public key)',
-      walletPlaceholder: '— hubungkan wallet-mu —',
+      walletPlaceholder: 'hubungkan wallet-mu…',
       walletNote:
         'Terisi otomatis dari wallet yang terhubung. Vault mengotorisasi tepat akun ini.',
       allocation: 'Rencana alokasi (USD)',
@@ -1017,7 +1017,7 @@ const id: LocaleDict = {
     },
     agents: {
       title: 'Ruang Kendali Agen',
-      sub: 'Kru otonom yang menjalankan ledger kebun ini — membaca rantai blok, bernalar atas data CPO nyata, dan menuliskan keputusannya sendiri kembali on-chain. Kerja rule-based dilabeli apa adanya; tak ada yang berpura-pura lebih pintar dari kenyataannya.',
+      sub: 'Kru otonom yang menjalankan ledger kebun ini: membaca rantai blok, bernalar atas data CPO nyata, dan menuliskan keputusannya sendiri kembali on-chain. Kerja rule-based dilabeli apa adanya; tak ada yang berpura-pura lebih pintar dari kenyataannya.',
       statusActive: 'Aktif',
       statusIdle: 'Idle',
       kindLlm: 'Digerakkan LLM',
@@ -1029,28 +1029,28 @@ const id: LocaleDict = {
       guardrailsLabel: 'Pagar pengaman',
       viewTx: 'Lihat tx ↗',
       lastKnownTag: 'terakhir diketahui · contoh berjalan',
-      idleHint: 'Idle di mesin ini — jalankan dengan',
+      idleHint: 'Idle di mesin ini. Jalankan dengan',
       provenanceLabel: 'Provenans data',
-      paidOfficial: 'Dibayar via x402 — protokol resmi',
-      paidReference: 'Dibayar via x402 — klien referensi',
-      unpaidFallback: 'Belum dibayar — memakai fallback representatif',
+      paidOfficial: 'Dibayar via x402 · protokol resmi',
+      paidReference: 'Dibayar via x402 · klien referensi',
+      unpaidFallback: 'Belum dibayar · memakai fallback representatif',
       provenanceUnknown: 'Belum ada pengambilan x402 tercatat di mesin ini',
       feedTitle: 'Feed otonomi',
-      feedEmpty: 'Belum ada agen yang menulis on-chain dari mesin ini — kartu di atas masih membawa contoh run terakhir yang diketahui tiap agen.',
+      feedEmpty: 'Belum ada agen yang menulis on-chain dari mesin ini. Kartu di atas masih membawa contoh run terakhir yang diketahui tiap agen.',
       mcpTitle: 'Perkakas MCP',
-      mcpBody: '{n} tools baca-saja yang live, diekspos lewat MCP agar klien LLM kompatibel mana pun bisa membaca state protokol langsung — tanpa kustodi, tanpa akses tulis.',
+      mcpBody: '{n} tools baca-saja yang live, diekspos lewat MCP agar klien LLM kompatibel mana pun bisa membaca state protokol langsung, tanpa kustodi dan tanpa akses tulis.',
       x402Title: 'Mikropembayaran x402',
-      x402Body: 'Agen membayar per permintaan untuk data CPO berbayar lewat protokol x402 Casper, diselesaikan dalam SAWITX — tanpa gas untuk agen, fasilitator yang menanggung gas.',
+      x402Body: 'Agen membayar per permintaan untuk data CPO berbayar lewat protokol x402 Casper, diselesaikan dalam SAWITX. Tanpa gas untuk agen, dan fasilitator yang menanggung gas.',
       onchainSnapshotTitle: 'Langsung dari rantai',
       onchainGorr: 'GORR',
       onchainOracleRep: 'Reputasi oracle',
       onchainEpochs: 'Epoch tercatat',
       onchainPrice: 'Harga CPO terbaru',
-      snapshotNote: 'Data snapshot — angka mungkin tertinggal dari rantai langsung.',
+      snapshotNote: 'Data snapshot. Angka mungkin tertinggal dari rantai langsung.',
       oracleTagline: 'Menaksir harga panen sebelum menyentuh ledger.',
       marketAnalystTagline: 'Menutup loop: membaca vault, bernalar dengan Gemini, menulis GORR kembali on-chain.',
-      allocationTagline: 'Mengubah setoran treasury jadi SAWIT secara deterministik — dengan jebakan LLM untuk anomali.',
-      yieldRouterTagline: 'Keeper yang benar-benar membayar — rule-based, tanpa LLM di jalur inti.',
+      allocationTagline: 'Mengubah setoran treasury jadi SAWIT secara deterministik, dengan jebakan LLM untuk anomali.',
+      yieldRouterTagline: 'Keeper yang benar-benar membayar: rule-based, tanpa LLM di jalur inti.',
     },
   },
   footer: {

@@ -76,11 +76,11 @@ const ERROR_RULES: ErrorRule[] = [
   },
   {
     pattern: /timeout|timed out/i,
-    message: 'Network timeout — please try again.',
+    message: 'Network timeout, please try again.',
   },
   {
     pattern: /fetch|network|Failed to fetch/i,
-    message: 'Network error — check your connection and try again.',
+    message: 'Network error: check your connection and try again.',
   },
   {
     pattern: /in_progress/i,

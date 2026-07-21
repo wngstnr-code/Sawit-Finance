@@ -20,7 +20,7 @@ const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Sawit Finance',
   description:
-    'Real palm oil, tokenized. Earn CSPR yield from verified Indonesian CPO production — on-chain on Casper, driven by autonomous AI agents.',
+    'Real palm oil, tokenized. Earn CSPR yield from verified Indonesian CPO production, on-chain on Casper, driven by autonomous AI agents.',
 };
 
 export default function RootLayout({

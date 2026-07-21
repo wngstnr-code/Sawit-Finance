@@ -54,7 +54,7 @@ export default function RequestAccess({
             Accept: 'application/json',
           },
           body: JSON.stringify({
-            _subject: 'SAWIT — Request investor access',
+            _subject: 'SAWIT: Request investor access',
             _template: 'table',
             _captcha: 'false',
             source: context,
@@ -125,7 +125,7 @@ export default function RequestAccess({
                   Request received.
                 </h4>
                 <p className="mt-2 text-[14px] leading-relaxed text-muted">
-                  Thanks — the SAWIT team will reach out to begin onboarding and
+                  Thanks. The SAWIT team will reach out to begin onboarding and
                   KYC. SAWIT is issued by a licensed operator, not sold on an
                   exchange.
                 </p>
