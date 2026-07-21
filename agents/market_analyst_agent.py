@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -102,6 +102,26 @@ class ContractState:
 
     total_sawit_supply: str
 
+    # Per-distribution-epoch detail from read_state. Needed because the contract's
+    # all-time counter only advances on sweep — see distributed_cspr() below.
+    epochs: list = field(default_factory=list)
+
+
+def distributed_cspr(state: "ContractState") -> float:
+    """CSPR actually distributed to holders, in CSPR (not motes).
+
+    Mirrors the frontend's distributedCspr() in frontend/src/lib/format.ts: the
+    contract's `total_distributed_cspr` counter only moves when an expired epoch is
+    swept, so it reads 0 while claim windows are still open. The sum of funded
+    epochs' pools is the honest number. Falls back to the counter when epoch detail
+    is unavailable, so an older read_state schema still degrades gracefully.
+    """
+    funded = [e for e in (state.epochs or []) if e.get("funded")]
+    if funded:
+        return sum(int(e.get("total_distribution_cspr") or 0) for e in funded) / 1e9
+    return int(state.total_distributed_cspr) / 1e9
+
+
 def _demo_state() -> ContractState:
     """Fallback state (clearly labelled) if the on-chain read is unavailable."""
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -123,6 +143,10 @@ def _demo_state() -> ContractState:
         gorr_bps=500,
         token_rate=1000,
         total_sawit_supply="6750000",
+        epochs=[
+            {"epoch_number": 2, "funded": True, "total_distribution_cspr": "10000000000000"},
+            {"epoch_number": 1, "funded": True, "total_distribution_cspr": "5000000000000"},
+        ],
     )
 
 def _read_state_blocking() -> Optional[ContractState]:
@@ -145,7 +169,7 @@ def _read_state_blocking() -> Optional[ContractState]:
     for line in proc.stdout.splitlines():
         if line.startswith("SAWIT_STATE_JSON "):
             d = json.loads(line[len("SAWIT_STATE_JSON "):])
-            # read_state may emit fields this agent doesn't model (e.g. `epochs`,
+            # read_state may emit fields this agent doesn't model (e.g.
             # `max_tons_per_epoch` added by later contract upgrades). Keep only the
             # keys ContractState declares so a superset schema never crashes the read.
             known = {f.name for f in fields(ContractState)}
@@ -180,7 +204,7 @@ async def run_gemini_analysis(state: ContractState) -> dict:
     # read_state reports SAWIT supply in whole tokens (SAWIT_DECIMALS = 0 across the
     # stack), so it must NOT be scaled. CSPR does arrive in motes, hence the /1e9 below.
     total_sawit = int(state.total_sawit_supply)
-    total_distributed = int(state.total_distributed_cspr) / 1e9
+    total_distributed = distributed_cspr(state)
 
     has_distribution = (
         state.current_distribution_epoch > 0
@@ -195,7 +219,9 @@ async def run_gemini_analysis(state: ContractState) -> dict:
             f"  - Current distribution epoch: {state.current_distribution_epoch}\n"
             f"  - Latest epoch funded: {state.latest_epoch_funded}\n"
             f"  - Claim deadline: {days_until_deadline} days remaining\n"
-            f"  - Total CSPR distributed all-time: {total_distributed:,.0f} CSPR"
+            f"  - Total CSPR distributed to holders: {total_distributed:,.0f} CSPR"
+            f" (sum of funded epoch pools; the contract's all-time counter reads"
+            f" {int(state.total_distributed_cspr)/1e9:,.0f} CSPR because it only advances on sweep)"
         )
     else:
         yield_lines = (
@@ -297,7 +323,7 @@ def _mock_analysis(state: ContractState) -> dict:
         state.current_distribution_epoch > 0
         and state.latest_epoch_claim_deadline_ms > 0
     )
-    is_bootstrapping = int(state.total_sawit_supply) == 0 and int(state.total_distributed_cspr) == 0
+    is_bootstrapping = int(state.total_sawit_supply) == 0 and distributed_cspr(state) == 0
 
     alerts = []
     if has_distribution:
