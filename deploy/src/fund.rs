@@ -27,7 +27,7 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
     let deployer = env.get_account(0);
-    println!("Authority account: {:?}", deployer);
+    println!("Authority account: loaded from deploy secret key");
 
     let mut dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());
     let cur = dist.get_current_epoch();

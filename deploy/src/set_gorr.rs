@@ -22,7 +22,7 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
     let authority = env.get_account(0);
-    println!("Authority account: {:?}", authority);
+    println!("Authority account: loaded from deploy secret key");
 
     let addr = Address::new(MINTER).expect("valid minter address");
     let mut minter = SawitMinter::load(&env, addr);

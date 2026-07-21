@@ -19,7 +19,7 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
     let deployer = env.get_account(0);
-    println!("Authority/pool account: {:?}", deployer);
+    println!("Authority/pool account: loaded from deploy secret key");
 
     let mut minter = SawitMinter::load(&env, Address::new(MINTER).unwrap());
     let token = SawitToken::load(&env, Address::new(TOKEN).unwrap());

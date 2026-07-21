@@ -20,7 +20,7 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
     let holder = env.get_account(0);
-    println!("Holder account: {:?}", holder);
+    println!("Holder account: loaded from deploy secret key");
 
     let mut vault = SawitProductionVault::load(&env, Address::new(VAULT).unwrap());
     let mut dist = SawitYieldDistributor::load(&env, Address::new(DIST).unwrap());

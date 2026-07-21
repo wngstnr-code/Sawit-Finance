@@ -33,7 +33,7 @@ fn main() {
 
     let env = odra_casper_livenet_env::env();
     let oracle = env.get_account(0);
-    println!("Oracle account: {:?}", oracle);
+    println!("Oracle account: loaded from deploy secret key");
 
     let addr = Address::new(VAULT).expect("valid vault address");
     let mut vault = SawitProductionVault::load(&env, addr);

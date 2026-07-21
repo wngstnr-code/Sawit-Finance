@@ -17,7 +17,7 @@ fn main() {
     const VAULT: &str = "hash-0b860c574e7b7cd6969a33dd57992fc6efedd503473b44e1c9309f1c8455e365";
 
     let env = odra_casper_livenet_env::env();
-    println!("Authority account: {:?}", env.get_account(0));
+    println!("Authority account: loaded from deploy secret key");
     let addr = Address::new(VAULT).unwrap();
 
     let vault = SawitProductionVault::load(&env, addr);

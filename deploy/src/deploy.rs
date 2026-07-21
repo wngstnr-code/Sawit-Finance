@@ -27,7 +27,7 @@ fn main() {
     let env = odra_casper_livenet_env::env();
 
     let deployer = env.get_account(0);
-    println!("Deployer account: {:?}", deployer);
+    println!("Deployer account: loaded from deploy secret key");
     println!("Installing 4 upgradable contracts...\n");
 
     env.set_gas(DEPLOY_GAS);

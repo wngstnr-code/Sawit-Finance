@@ -17,7 +17,7 @@ fn main() {
     const DIST: &str = "hash-1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9";
 
     let env = odra_casper_livenet_env::env();
-    println!("Authority account: {:?}", env.get_account(0));
+    println!("Authority account: loaded from deploy secret key");
     let addr = Address::new(DIST).unwrap();
 
     let dist = SawitYieldDistributor::load(&env, addr);
