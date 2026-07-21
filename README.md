@@ -221,7 +221,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 | On-chain reads | `read_state` / `read_balance` Odra livenet bridges (reads Odra's internal state CSPR.cloud can't) |
 | Frontend | Next.js 14 + CSPR.click wallet + casper-js-sdk (landing + investor dashboard, live claims) |
 
-**App freshness.** Portfolio now shows the connected wallet's **real on-chain activity**: the app merges its local action log with the wallet's full deploy history, fetched server-side from CSPR.cloud via `/api/activity` (the CSPR.cloud API key stays server-side, never shipped to the client). The provenance/epoch table now includes distribution-only epochs too (e.g. the epoch-3 re-fund) — `read_state` iterates distribution epochs with the production record treated as optional. The **"CSPR distributed"** metric is the sum of funded epochs' distribution pools (the contract's all-time counter only advances on sweep) — currently **160 CSPR across 3 funded epochs**. On the landing page, the On-chain Proof section is now a vertical ledger with all five tx proofs always visible. Buying SAWIT is live too: the app's **Acquire tab** issues a native CSPR transfer (memo `5417`) to the treasury, and the [Allocation Agent](#the-agentic-layer) screens the deposit and settles SAWIT back automatically.
+**App freshness.** Portfolio now shows the connected wallet's **real on-chain activity**: the app merges its local action log with the wallet's full deploy history, fetched server-side from CSPR.cloud via `/api/activity` (the CSPR.cloud API key stays server-side, never shipped to the client). The provenance/epoch table now includes distribution-only epochs too (e.g. the epoch-3 re-fund) — `read_state` iterates distribution epochs with the production record treated as optional. The **"CSPR distributed"** metric is the sum of funded epochs' distribution pools (the contract's all-time counter only advances on sweep) — currently **260 CSPR across 4 funded epochs**. On the landing page, the On-chain Proof section is now a vertical ledger with all five tx proofs always visible. Buying SAWIT is live too: the app's **Acquire tab** issues a native CSPR transfer (memo `5417`) to the treasury, and the [Allocation Agent](#the-agentic-layer) screens the deposit and settles SAWIT back automatically.
 
 ---
 
@@ -229,7 +229,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 
 ```bash
 # 1. Contracts — run all tests incl. the full e2e pipeline (no node needed)
-cargo +nightly-2026-01-01 test            # 65 tests, incl. record→mint→KYC→claim
+cargo +nightly-2026-01-01 test            # 68 tests, incl. record→mint→KYC→claim
 
 # 2. Agents
 python3 -m venv .venv && ./.venv/bin/pip install -r agents/requirements.txt
@@ -294,7 +294,9 @@ The fix shipped as a **live, in-place package upgrade** — the contracts have b
 - **Third in-place upgrade — a production-integrity bound on the vault:** `ProductionVault.record_production` now enforces a per-epoch tonnage ceiling (`max_tons_per_epoch`, default 100,000 t, operator-tunable via `set_max_tons_per_epoch`) so a compromised or fat-fingered oracle can't mint SAWIT against an absurd tonnage. Shipped as the same kind of live, state-retaining package upgrade — vault epoch count preserved (2 → 2) and the new `get_max_tons_per_epoch` getter live on-chain — [`48cb7b52…`](https://testnet.cspr.live/transaction/48cb7b52e29a6e55089696dd3513bc9d3d2048f5b11cfd396f97874010c54d53). The distributor was re-upgraded in the same operation ([`fb2144e1…`](https://testnet.cspr.live/transaction/fb2144e1573275029787123baee19cb326a7501e2989fd591a6b4a937243064f)) and the claim window set to 30 days ([`01882b76…`](https://testnet.cspr.live/transaction/01882b76c39320372e18e9916250a42a8323d6f021afd31ea5bf97bdb21949ca)).
 - **Guard verified live (again):** an intentional `record_production` of 150,000 t — above the 100,000 t ceiling — was rejected on-chain, `User error: 7` (`TonsExceedsLimit`), and the epoch count stayed unchanged — [`c5c9debd…`](https://testnet.cspr.live/transaction/c5c9debde91e7a28ab886466e27a23d81ae8e625b66589da50bed7adc1e72d27)
 
-This is the protocol lifecycle working as designed — **monitor → diagnose on-chain → patch → upgrade in place → verify with a real revert.** Casper's upgradable packages made the fix a deploy, not a migration.
+- **Fourth in-place upgrade — recovering a wedged distribution epoch.** A later incident showed the same lifecycle end-to-end. Distribution epoch 4 had been created with a **5,000 CSPR pool taken from a stale config default** while the operator purse could only cover 100, so its `fund_epoch` failed and `is_funded` stayed false. Because that flag gates **both** `claim_yield` and `sweep_unclaimed`, the 100 CSPR later deposited and allocated to a KYC-verified holder was **unclaimable and un-sweepable** — and since the funding tool reuses the current epoch while it is unfunded, every future yield cycle would have poured into epoch 4 instead of opening epoch 5. A permanent wedge, found by reading live state rather than from a failing test. The fix adds an authority-only `resize_unfunded_epoch`: it refuses funded and swept epochs, and refuses to drop a pool below either the CSPR already allocated to holders or the amount already deposited, so it can never strand funds or recreate the over-allocation bug above. Resizing down to what was actually deposited completes the funding, flipping `is_funded` exactly as `fund_epoch` would — [upgrade `4ccb8c71…`](https://testnet.cspr.live/transaction/4ccb8c719c675759c06256107f20e605cfdb2db6301b79a62c6375ff6146e3fe), [resize `87495719…`](https://testnet.cspr.live/transaction/87495719082fed8d135d3e7a183abf45be3ef2c4c10d4de9271e04df5d2392a0). Epoch 4 is now a funded 100 CSPR pool with its claim window intact, and the funded-epoch total moved from 160 to **260 CSPR**.
+
+This is the protocol lifecycle working as designed — **monitor → diagnose on-chain → patch → upgrade in place → verify with a real revert.** Casper's upgradable packages made every one of these four fixes a deploy, not a migration.
 
 ### Operator tooling
 
@@ -303,6 +305,7 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 - `inspect_epoch` — dumps any distribution epoch, its claimables, and the new running `claimable_total`
 - `topup` — a payable purse top-up via `fund_epoch` (requires explicit `TOPUP_EPOCH` / `TOPUP_AMOUNT_MOTES`, no silent defaults)
 - `upgrade_dist` / `upgrade_vault` — the in-place package upgrade paths (distributor and vault)
+- `resize_epoch` — corrects the declared pool of an epoch whose funding never completed (requires explicit `RESIZE_EPOCH` / `RESIZE_POOL_MOTES`)
 
 `set_claimable` itself now **requires an explicit `CLAIM_AMOUNT_MOTES`** — the old silent 25-CSPR default is gone; it was the root cause of the over-allocation in the first place.
 
@@ -351,7 +354,7 @@ A revenue-sharing claim on a real Indonesian commodity is a regulated instrument
 | **CSPR/USD FX mismatch** — revenue is USD, yield is CSPR | csprUSD migration is Phase 1 |
 | **Regulatory classification** could restrict a public offering | Private placement is the fallback structure; contracts are upgradable and KYC is already enforced on-chain |
 
-**Who's building this:** Sawit Finance is designed, built, and operated solo by [Wangsit Nursyahada](https://github.com/wngstnr-code) ([@wnsstt](https://x.com/wnsstt)) — the same operator who deployed the contracts, ran the agents, and shipped the three live in-place upgrades documented above, including the epoch-1 incident response. One person, but a protocol that's already been *operated*, not just demoed.
+**Who's building this:** Sawit Finance is designed, built, and operated solo by [Wangsit Nursyahada](https://github.com/wngstnr-code) ([@wnsstt](https://x.com/wnsstt)) — the same operator who deployed the contracts, ran the agents, and shipped the four live in-place upgrades documented above, including the epoch-1 over-allocation and epoch-4 wedge incident responses. One person, but a protocol that's already been *operated*, not just demoed.
 
 **Where to follow the build:** [X / Twitter @wnsstt](https://x.com/wnsstt) (active) · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159) · live app [sawitfinance.xyz](https://sawitfinance.xyz)
 
@@ -361,13 +364,13 @@ A revenue-sharing claim on a real Indonesian commodity is a regulated instrument
 
 | Criterion | Implementation |
 |-----------|---------------|
-| Technical Execution | 4 Odra contracts, 65 tests (incl. full e2e + access-control guards on every privileged entry point), 3 real CPIs, full loop live on Testnet |
+| Technical Execution | 4 Odra contracts, 68 tests (incl. full e2e + access-control guards on every privileged entry point), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
 | Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** + 4 agents running **unattended from a CI scheduler** (live Agent Control Room) |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
-| Working Contracts | 65 tests green; upgradable, deployed + executed + UPGRADED IN PLACE on Casper Testnet |
+| Working Contracts | 68 tests green; upgradable, deployed + executed + UPGRADED IN PLACE (4x) on Casper Testnet |
 | Long-Term Launch Plans | Milestone-gated [Launch Plan](#launch-plan) — security review → mainnet → real mill data → decentralized trust; active socials |
 
 ---
