@@ -87,5 +87,9 @@ name = "set_window"
 path = "src/set_window.rs"
 
 [[bin]]
+name = "resize_epoch"
+path = "src/resize_epoch.rs"
+
+[[bin]]
 name = "upgrade_vault"
 path = "src/upgrade_vault.rs"

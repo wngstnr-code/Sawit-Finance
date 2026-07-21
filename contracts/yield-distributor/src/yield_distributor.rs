@@ -40,6 +40,8 @@ pub enum DistError {
     // shift, or already-integrated tooling/tests would misinterpret reverts.
     BatchLengthMismatch = 15,
     OverfundsPool = 16,
+    EpochAlreadyFunded = 17,
+    PoolBelowCommitted = 18,
 }
 
 #[odra::event]
@@ -82,11 +84,21 @@ pub struct ClaimWindowUpdated {
     pub window_ms: u64,
 }
 
+#[odra::event]
+pub struct EpochResized {
+    pub epoch_number: u64,
+    pub old_pool_cspr: U512,
+    pub new_pool_cspr: U512,
+    pub funded_cspr: U512,
+    pub is_fully_funded: bool,
+    pub timestamp: u64,
+}
+
 // 30 days, in milliseconds. Applies to epochs created from now on; already
 // stored epochs keep their previously computed claim_deadline untouched.
 const DEFAULT_CLAIM_WINDOW: u64 = 2_592_000_000u64;
 
-#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept, EpochFunded, ClaimWindowUpdated], errors = DistError)]
+#[odra::module(events = [EpochCreated, YieldClaimed, EpochSwept, EpochFunded, ClaimWindowUpdated, EpochResized], errors = DistError)]
 pub struct SawitYieldDistributor {
     authority: Var<Address>,
     yield_router: Var<Address>,
@@ -246,6 +258,55 @@ impl SawitYieldDistributor {
             epoch_number,
             amount_cspr: attached,
             cumulative_funded_cspr: cumulative,
+            is_fully_funded,
+            timestamp: self.env().get_block_time(),
+        });
+    }
+
+    /// Lower (or raise) the declared pool of an epoch whose funding never completed.
+    ///
+    /// Exists because `create_epoch` fixes the pool up front, so a mis-sized epoch —
+    /// e.g. one created from a stale config default whose `fund_epoch` then failed —
+    /// is otherwise permanently stuck: `is_funded` can never flip, which blocks both
+    /// `claim_yield` and `sweep_unclaimed`, and the router's reuse path keeps
+    /// targeting it instead of opening a new epoch.
+    ///
+    /// Resizing down to what was actually deposited completes the funding, so the
+    /// flag flips exactly as `fund_epoch` would have. The pool may never drop below
+    /// the CSPR already allocated to holders (that is the invariant `ClaimableExceedsPool`
+    /// protects) nor below what has already been deposited (which would strand it
+    /// above the ceiling `fund_epoch` enforces).
+    pub fn resize_unfunded_epoch(&mut self, epoch_number: u64, new_pool_cspr: U512) {
+        self.assert_authority();
+        let mut epoch = self.get_epoch_or_revert(epoch_number);
+
+        if epoch.is_funded {
+            self.env().revert(DistError::EpochAlreadyFunded)
+        }
+        if epoch.is_swept {
+            self.env().revert(DistError::EpochAlreadySwept)
+        }
+
+        let allocated = self.claimable_total.get_or_default(&epoch_number);
+        let funded = self.funded_amount.get_or_default(&epoch_number);
+        if new_pool_cspr < allocated || new_pool_cspr < funded {
+            self.env().revert(DistError::PoolBelowCommitted)
+        }
+
+        let old_pool_cspr = epoch.total_distribution_cspr;
+        epoch.total_distribution_cspr = new_pool_cspr;
+
+        let is_fully_funded = funded >= new_pool_cspr;
+        if is_fully_funded {
+            epoch.is_funded = true;
+        }
+        self.epochs.set(&epoch_number, epoch);
+
+        self.env().emit_event(EpochResized {
+            epoch_number,
+            old_pool_cspr,
+            new_pool_cspr,
+            funded_cspr: funded,
             is_fully_funded,
             timestamp: self.env().get_block_time(),
         });
@@ -600,6 +661,76 @@ mod tests {
         env.set_caller(holder);
         dist.claim_yield(1u64);
         assert!(dist.has_claimed(1u64, &holder));
+    }
+
+    /// Reproduces the live epoch-4 situation: an epoch created with an oversized
+    /// pool from a stale config default, partially funded, then stuck.
+    #[test]
+    fn test_resize_unfunded_epoch_unblocks_claim() {
+        let env = odra_test::env();
+        let (mut dist, mut vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        vault.register_kyc(holder);
+        // Pool declared far above what the purse can cover.
+        dist.create_epoch("Jul-26".to_string(), U512::from(5_000_000_000u64), 1u64, 85_000u64);
+        dist.set_claimable(1u64, holder, U512::from(100_000_000u64));
+        dist.with_tokens(U512::from(100_000_000u64)).fund_epoch(1u64);
+
+        // Stuck: not funded, so neither claiming nor sweeping is possible.
+        assert!(!dist.get_epoch(1).unwrap().is_funded);
+        env.set_caller(holder);
+        assert!(dist.try_claim_yield(1u64).is_err());
+        env.set_caller(env.get_account(0));
+
+        // Resizing to what was actually deposited completes the funding.
+        dist.resize_unfunded_epoch(1u64, U512::from(100_000_000u64));
+        let epoch = dist.get_epoch(1).unwrap();
+        assert!(epoch.is_funded);
+        assert_eq!(epoch.total_distribution_cspr, U512::from(100_000_000u64));
+
+        env.set_caller(holder);
+        dist.claim_yield(1u64);
+        assert!(dist.has_claimed(1u64, &holder));
+    }
+
+    #[test]
+    fn test_resize_cannot_strand_allocated_or_funded_cspr() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+        let holder = env.get_account(2);
+
+        dist.create_epoch("Jul-26".to_string(), U512::from(5_000_000_000u64), 1u64, 85_000u64);
+        dist.set_claimable(1u64, holder, U512::from(2_000_000_000u64));
+        dist.with_tokens(U512::from(1_000_000_000u64)).fund_epoch(1u64);
+
+        // Below the 2 CSPR already allocated to the holder.
+        assert!(dist.try_resize_unfunded_epoch(1u64, U512::from(1_500_000_000u64)).is_err());
+        // Below the 1 CSPR already deposited (allocation lowered first so only
+        // the funded floor is under test).
+        dist.set_claimable(1u64, holder, U512::from(500_000_000u64));
+        assert!(dist.try_resize_unfunded_epoch(1u64, U512::from(900_000_000u64)).is_err());
+        // Exactly at the deposited amount is allowed and completes funding.
+        dist.resize_unfunded_epoch(1u64, U512::from(1_000_000_000u64));
+        assert!(dist.get_epoch(1).unwrap().is_funded);
+    }
+
+    #[test]
+    fn test_resize_rejects_funded_epoch_and_non_authority() {
+        let env = odra_test::env();
+        let (mut dist, _vault) = setup(&env);
+
+        dist.create_epoch("Jul-26".to_string(), U512::from(1_000_000_000u64), 1u64, 85_000u64);
+        dist.with_tokens(U512::from(1_000_000_000u64)).fund_epoch(1u64);
+        assert!(dist.get_epoch(1).unwrap().is_funded);
+
+        // A fully funded epoch is immutable.
+        assert!(dist.try_resize_unfunded_epoch(1u64, U512::from(500_000_000u64)).is_err());
+
+        // And only the authority may resize at all.
+        dist.create_epoch("Aug-26".to_string(), U512::from(5_000_000_000u64), 1u64, 85_000u64);
+        env.set_caller(env.get_account(3));
+        assert!(dist.try_resize_unfunded_epoch(2u64, U512::from(100_000_000u64)).is_err());
     }
 
     #[test]
