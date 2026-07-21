@@ -88,7 +88,7 @@ The complete cycle has run end-to-end on `casper-test`: **record production → 
 |------|---------------|----|
 | 1. Record | Oracle records epoch: 45,200 t CPO @ $825, oracle reputation 92/100 | [`4d83e1a4…`](https://testnet.cspr.live/transaction/4d83e1a4b9c12ee2f386e0e14fd325a14ae81abb9446508650a20471b54a7bdb) |
 | 2. Mint | TokenMinter (CPI→Vault, CPI→Token) mints **2,260,000 SAWIT** | [`b257a688…`](https://testnet.cspr.live/transaction/b257a68867b5253b1d5f05c6e362759091f91ec223cd650b6f555335351afb93) |
-| 3. Fund | Distribution epoch funded with **100 CSPR** (90-day claim window) | [`6fb18931…`](https://testnet.cspr.live/transaction/6fb1893145d969bad32e0f6ba26810a81f532be5b5b288af3977a142e489772f) |
+| 3. Fund | Distribution epoch funded with **100 CSPR** (claim window now 30 days — [tuned live](#live-protocol-operations--a-real-incident-fixed-with-a-live-upgrade)) | [`6fb18931…`](https://testnet.cspr.live/transaction/6fb1893145d969bad32e0f6ba26810a81f532be5b5b288af3977a142e489772f) |
 | 4. Claim | KYC-verified holder claims (CPI→Vault KYC check) → **CSPR to holder** | [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) |
 
 This exercises every core entrypoint, **3 real cross-contract CPIs**, and a **payable** CSPR transfer — the same flow the AI agents drive autonomously.
@@ -110,15 +110,18 @@ Deployer account hash: `57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd0
 
 ## The Agentic Layer
 
-Three autonomous agents run the protocol — two with a real LLM at the decision point, one deliberately rule-based — and this is the heart of the Buildathon entry.
+Four autonomous agents run the protocol — two with a real LLM at the decision point, two deliberately deterministic — and this is the heart of the Buildathon entry.
 
 | Agent | Role | AI |
 |-------|------|----|
 | **Oracle Agent** | Anchors on the live FRED/IMF palm oil price, cross-validates GAPKI/KPBN/MPOB with Gemini, posts verified data on-chain | Gemini 2.5 Flash |
 | **Yield Router** | Monitors CPO price, auto-triggers CSPR yield distribution when a threshold is met | Rule-based |
 | **Market Analyst** | Reads all 4 contracts, runs Gemini strategy analysis, **autonomously adjusts GORR on-chain** | Gemini 2.5 Flash |
+| **Allocation Agent** | Settles SAWIT purchases: watches the treasury for CSPR deposits tagged with buy-memo `5417` (the app's Acquire tab), allocates + sends SAWIT deterministically (10 CSPR/SAWIT, deduped by deploy hash) | Rule-based + Gemini advisory screen |
 
-**Every agent writes on-chain — for real (no simulated hashes).** Each agent signs and broadcasts its decision as a live Casper transaction: the Oracle records verified production ([`2e6e00b1…`](https://testnet.cspr.live/transaction/2e6e00b168066072d960184fdee4300c46a946dbb3b6b6b141c8fcb8166e8ac6)), the Yield Router funds a distribution epoch ([`3cb6b496…`](https://testnet.cspr.live/transaction/3cb6b496392c88b80e2ebe64820d2858b78e948072f963ac52b9f122438856b8)), and the Market Analyst tunes GORR ([`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0)). Two agents are **LLM-driven** (Oracle, Market Analyst — Gemini 2.5 Flash); the Yield Router is a **rule-based trigger**. All three act through the same signed-livenet path.
+The Allocation Agent keeps the LLM **out of the settlement hot path** on purpose: amounts and pricing are deterministic; Gemini only *screens* each deposit for anomalies (oversized or rapid-repeat deposits), and anything flagged is held for manual review instead of auto-allocated.
+
+**Every agent writes on-chain — for real (no simulated hashes).** Each agent signs and broadcasts its decision as a live Casper transaction: the Oracle records verified production ([`2e6e00b1…`](https://testnet.cspr.live/transaction/2e6e00b168066072d960184fdee4300c46a946dbb3b6b6b141c8fcb8166e8ac6)), the Yield Router funds a distribution epoch ([`3cb6b496…`](https://testnet.cspr.live/transaction/3cb6b496392c88b80e2ebe64820d2858b78e948072f963ac52b9f122438856b8)), and the Market Analyst tunes GORR ([`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0)). Two agents are **LLM-driven** (Oracle, Market Analyst — Gemini 2.5 Flash); the Yield Router and Allocation Agent are **deterministic**. All four act through the same signed-livenet path.
 
 **Closed-loop autonomy — a real on-chain decision.** The Market Analyst is the only agent that closes the loop: `READ chain → REASON with Gemini → WRITE back to chain`. With `AUTONOMY_MODE=on` it signs and **broadcasts a real `TokenMinter.update_config()` transaction** to tune GORR from its own analysis. This isn't scaffolded, and it isn't a one-off — the agent has tuned GORR on-chain across separate cycles, from its own fresh analysis each time:
 
@@ -130,6 +133,8 @@ Three autonomous agents run the protocol — two with a real LLM at the decision
 **Safety rails** cap any single change to ±100 bps and lock GORR to a [1%, 10%] band, with a 24h cooldown between changes — a hallucinated recommendation can never harm holders. Both cycles landed inside those rails.
 
 **Gemini reasoning gate.** Before data hits the chain, the Oracle Agent passes all 3 source readings to Gemini, which flags seasonal anomalies / suspicious spikes and can veto a submission (`"recommendation": "REJECT"` blocks the epoch regardless of the statistical score).
+
+**Unattended autonomy — the agents run from CI, not a laptop.** A GitHub Actions scheduler ([`.github/workflows/agents.yml`](.github/workflows/agents.yml)) runs the agents on an orchestrated cadence — Market Analyst and Allocation daily, Oracle → Yield Router monthly. Each cycle signs and broadcasts **real Casper Testnet transactions from CI**, then commits the resulting agent state back to the repo; that commit redeploys [sawitfinance.xyz](https://sawitfinance.xyz), so the **Agent Control Room** on the live site always reflects genuine, fresh on-chain activity with no human in the loop. Any agent can also be run on demand via `workflow_dispatch`.
 
 ### Data provenance — what's live vs. representative
 
@@ -216,7 +221,7 @@ sawit_minted = tons_cpo × token_rate × (gorr_bps / 10,000)
 | On-chain reads | `read_state` / `read_balance` Odra livenet bridges (reads Odra's internal state CSPR.cloud can't) |
 | Frontend | Next.js 14 + CSPR.click wallet + casper-js-sdk (landing + investor dashboard, live claims) |
 
-**App freshness.** Portfolio now shows the connected wallet's **real on-chain activity**: the app merges its local action log with the wallet's full deploy history, fetched server-side from CSPR.cloud via `/api/activity` (the CSPR.cloud API key stays server-side, never shipped to the client). The provenance/epoch table now includes distribution-only epochs too (e.g. the epoch-3 re-fund) — `read_state` iterates distribution epochs with the production record treated as optional. The **"CSPR distributed"** metric is the sum of funded epochs' distribution pools (the contract's all-time counter only advances on sweep) — currently **160 CSPR across 3 funded epochs**. On the landing page, the On-chain Proof section is now a vertical ledger with all five tx proofs always visible.
+**App freshness.** Portfolio now shows the connected wallet's **real on-chain activity**: the app merges its local action log with the wallet's full deploy history, fetched server-side from CSPR.cloud via `/api/activity` (the CSPR.cloud API key stays server-side, never shipped to the client). The provenance/epoch table now includes distribution-only epochs too (e.g. the epoch-3 re-fund) — `read_state` iterates distribution epochs with the production record treated as optional. The **"CSPR distributed"** metric is the sum of funded epochs' distribution pools (the contract's all-time counter only advances on sweep) — currently **160 CSPR across 3 funded epochs**. On the landing page, the On-chain Proof section is now a vertical ledger with all five tx proofs always visible. Buying SAWIT is live too: the app's **Acquire tab** issues a native CSPR transfer (memo `5417`) to the treasury, and the [Allocation Agent](#the-agentic-layer) screens the deposit and settles SAWIT back automatically.
 
 ---
 
@@ -232,6 +237,7 @@ cp agents/.env.example agents/.env        # fill GEMINI_API_KEY (free) + contrac
 
 ./.venv/bin/python agents/oracle_agent.py         # AI oracle (live price + Gemini)
 ./.venv/bin/python agents/market_analyst_agent.py # closed-loop GORR autonomy
+./.venv/bin/python agents/allocation_agent.py --once  # screen buy-deposits + settle SAWIT
 
 # 3a. x402 — official protocol (EIP-712 + CEP-18 transfer_with_authorization)
 cd agents/x402-official && npm install
@@ -263,11 +269,12 @@ Deploy to Testnet (Odra livenet backend) and reproducible-build verification are
 
 ```
 contracts/   production-vault · sawit-token · token-minter · yield-distributor  (Odra/Rust)
-agents/      oracle · yield_router · market_analyst · x402 (reference) · x402_settle · mcp_server
+agents/      oracle · yield_router · market_analyst · allocation · x402 (reference) · x402_settle · mcp_server
 agents/x402-official/  official-protocol x402: facilitator · gated server · paying agent (TS)
 e2e/         full_flow.rs — production → mint → KYC → claim across all 4 contracts
 deploy/      livenet deploy + agent-driven bins (record/fund/set_gorr/mint/claim/set_claimable) + read_state/read_balance bridges
 frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live reads & claims)
+.github/workflows/agents.yml  CI scheduler — unattended agent cycles signing real Testnet txs
 ```
 
 Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
@@ -356,7 +363,7 @@ A revenue-sharing claim on a real Indonesian commodity is a regulated instrument
 |-----------|---------------|
 | Technical Execution | 4 Odra contracts, 65 tests (incl. full e2e + access-control guards on every privileged entry point), 3 real CPIs, full loop live on Testnet |
 | Innovation | First Indonesian palm oil RWA on Casper |
-| Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** |
+| Agentic AI | Closed-loop autonomous agent (read→reason→write) + Gemini + **official-protocol x402 live settlement** (+ from-scratch reference impl) + **Casper MCP server** + 4 agents running **unattended from a CI scheduler** (live Agent Control Room) |
 | Oracle Reputation | On-chain rolling accuracy score, readable via `get_oracle_reputation()` |
 | Compliance | KYC-gated yield claims, enforced cross-contract |
 | Real-World Applicability | $30B CPO market, live FRED/IMF price feed |
