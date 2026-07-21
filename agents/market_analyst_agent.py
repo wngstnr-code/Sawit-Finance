@@ -118,10 +118,11 @@ def _demo_state() -> ContractState:
         latest_epoch_funded=True,
         latest_epoch_claim_deadline_ms=now_ms + (7 * 24 * 3600 * 1000),
         total_distributed_cspr="15000000000000",
-        total_tokens_minted="6750000000000000",
+        # Whole SAWIT tokens, matching read_state: 135,000 t x 1,000 x 500 bps.
+        total_tokens_minted="6750000",
         gorr_bps=500,
         token_rate=1000,
-        total_sawit_supply="6750000000000000",
+        total_sawit_supply="6750000",
     )
 
 def _read_state_blocking() -> Optional[ContractState]:
@@ -176,7 +177,9 @@ async def run_gemini_analysis(state: ContractState) -> dict:
         return _mock_analysis(state)
 
     now = datetime.now(timezone.utc)
-    total_sawit = int(state.total_sawit_supply) / 1e9
+    # read_state reports SAWIT supply in whole tokens (SAWIT_DECIMALS = 0 across the
+    # stack), so it must NOT be scaled. CSPR does arrive in motes, hence the /1e9 below.
+    total_sawit = int(state.total_sawit_supply)
     total_distributed = int(state.total_distributed_cspr) / 1e9
 
     has_distribution = (
