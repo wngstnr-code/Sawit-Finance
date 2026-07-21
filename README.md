@@ -307,7 +307,7 @@ The repo ships read-only and operational bins for exactly this kind of live oper
 - `upgrade_dist` / `upgrade_vault` — the in-place package upgrade paths (distributor and vault)
 - `resize_epoch` — corrects the declared pool of an epoch whose funding never completed (requires explicit `RESIZE_EPOCH` / `RESIZE_POOL_MOTES`)
 
-`set_claimable` itself now **requires an explicit `CLAIM_AMOUNT_MOTES`** — the old silent 25-CSPR default is gone; it was the root cause of the over-allocation in the first place.
+`set_claimable` itself now **requires an explicit `CLAIM_AMOUNT_MOTES`** — the old silent 25-CSPR default is gone; it was the root cause of the over-allocation in the first place. The same rule now applies to `fund`, which **requires an explicit `FUND_AMOUNT_MOTES`**: that value sizes a real distribution pool, and `create_epoch` fixes that size permanently — a silent default is how an epoch ends up declared at a size the purse can never cover.
 
 ---
 

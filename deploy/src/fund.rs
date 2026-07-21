@@ -14,10 +14,21 @@ fn main() {
 
     const DIST: &str = "hash-1a04935782cbd60b7a4cfddea6ab18a6efd0348b862171c6a4fe25c111ccf1e9";
 
-    let pool_motes: u64 = std::env::var("FUND_AMOUNT_MOTES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(100_000_000_000u64);
+    // No default on purpose: this sizes a real distribution pool and moves CSPR, and
+    // `create_epoch` fixes that size permanently. A silent default is precisely what
+    // caused the original over-allocation incident on `set_claimable`.
+    let pool_motes: u64 = match std::env::var("FUND_AMOUNT_MOTES").ok().and_then(|v| v.parse().ok())
+    {
+        Some(0) => {
+            eprintln!("FUND_AMOUNT_MOTES must be greater than zero");
+            std::process::exit(2);
+        }
+        Some(v) => v,
+        None => {
+            eprintln!("FUND_AMOUNT_MOTES is required (pool size in motes, 1 CSPR = 1e9)");
+            std::process::exit(2);
+        }
+    };
     let trigger_cents: u64 = std::env::var("FUND_TRIGGER_CENTS")
         .ok()
         .and_then(|v| v.parse().ok())
