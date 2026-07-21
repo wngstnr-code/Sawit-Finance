@@ -21,6 +21,10 @@ secret_key*
 *.notes.md
 pr_final.md
 
+# Internal working notes — never publish
+demo-script.md
+x-thread-final.md
+
 .venv/
 __pycache__/
 *.pyc
