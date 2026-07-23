@@ -6,10 +6,10 @@
 
 Built for the **Casper Agentic Buildathon 2026**.
 
-**🎥 [Watch the demo](https://youtu.be/jT4uH5fRL8E)** · **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159)
+**🎥 [Watch the demo](https://youtu.be/tHIca3Gi8NU)** · **🌐 Live app: [sawitfinance.xyz](https://sawitfinance.xyz)** · Live on Casper Testnet · [GitHub](https://github.com/wngstnr-code/Sawit-Finance) · [X / Twitter](https://x.com/wnsstt) · [DoraHacks BUIDL](https://dorahacks.io/buidl/46159)
 
 > ### ✅ Verify it yourself in 30 seconds
-> - **🎥 Watch the demo:** [youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E) — full walkthrough (claim, agent on-chain write, MCP, x402)
+> - **🎥 Watch the demo:** [youtu.be/tHIca3Gi8NU](https://youtu.be/tHIca3Gi8NU) — full walkthrough (claim, agent on-chain write, MCP, x402)
 > - **🟢 Use it:** [sawitfinance.xyz](https://sawitfinance.xyz) — connect a Casper wallet and claim real CSPR yield
 > - **⛓️ See the loop on-chain:** KYC-gated yield claim [`23e6e9d7…`](https://testnet.cspr.live/transaction/23e6e9d7d665a3a94e58170ee2c70434cf6dc71f8c18a2998f97f8497f80f8f6) on cspr.live (record→mint→fund→claim — [full loop below](#live-on-casper-testnet--the-full-loop-executed-on-chain))
 > - **🤖 Agentic write:** an autonomous agent's GORR decision, broadcast on-chain [`1b703ee1…`](https://testnet.cspr.live/transaction/1b703ee1d289ebdcee96496b2ff0d0ecb8c9aad708c6ad29f31dd428467cc0d0) (read→reason→write, with safety rails)
@@ -159,7 +159,7 @@ This is a **data-source** limitation, not an architectural one. The pipeline is 
 | `get_contracts` / `get_economic_loop` | deployed hashes + executed-loop tx (cspr.live links) |
 | `refresh_protocol_state` | force a fresh live read of all four contracts |
 
-**See it connected:** the [demo video](https://youtu.be/jT4uH5fRL8E) shows Claude Desktop connected to this server and invoking these tools live against Casper Testnet. To reproduce it yourself, add the server to your MCP client config:
+**See it connected:** the [demo video](https://youtu.be/tHIca3Gi8NU) shows Claude Desktop connected to this server and invoking these tools live against Casper Testnet. To reproduce it yourself, add the server to your MCP client config:
 
 ```jsonc
 // claude_desktop_config.json → "mcpServers"
@@ -277,7 +277,7 @@ frontend/    Next.js 14 app — landing + investor dashboard (CSPR.click, live r
 .github/workflows/agents.yml  CI scheduler — unattended agent cycles signing real Testnet txs
 ```
 
-Demo: **[youtu.be/jT4uH5fRL8E](https://youtu.be/jT4uH5fRL8E)** · Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
+Demo: **[youtu.be/tHIca3Gi8NU](https://youtu.be/tHIca3Gi8NU)** · Live app: **[sawitfinance.xyz](https://sawitfinance.xyz)** · GitHub: **[wngstnr-code/Sawit-Finance](https://github.com/wngstnr-code/Sawit-Finance)** · X: **[@wnsstt](https://x.com/wnsstt)**
 
 ---
 
