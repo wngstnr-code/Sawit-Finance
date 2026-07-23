@@ -57,7 +57,7 @@ def _load_env(path: str) -> dict:
 def _run_bridge(bin_path: str, extra_env: dict, marker: str) -> dict:
     """Run a read bridge binary and parse its `<MARKER> {json}` line."""
     env = {**os.environ, **_load_env(ENV_FILE), **extra_env}
-    proc = subprocess.run([bin_path], env=env, capture_output=True, text=True, timeout=130)
+    proc = subprocess.run([bin_path], env=env, capture_output=True, text=True, timeout=300)
     for line in proc.stdout.splitlines():
         if line.startswith(marker + " "):
             return json.loads(line[len(marker) + 1:])
