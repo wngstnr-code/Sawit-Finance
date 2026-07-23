@@ -158,7 +158,7 @@ def _account_hash(public_key_hex: str) -> str:
 
 @mcp.tool()
 def get_protocol_state() -> dict:
-    """Live on-chain state of the protocol: SAWIT supply, CPO tonnage/price, GORR, oracle reputation, epochs, and the claim window."""
+    """Live on-chain state of the protocol: SAWIT supply, CPO tonnage/price, GORR (Gross Overriding Royalty Rate — the share of CPO revenue routed to holders, tuned by the AI Market Analyst), oracle reputation, epochs, and the claim window."""
     s = _state()
     price = s.get("latest_cpo_price_cents", 0) / 100
     return {
@@ -168,6 +168,7 @@ def get_protocol_state() -> dict:
         "total_cpo_tons": s.get("total_tons_cpo"),
         "cpo_price_usd_per_ton": price,
         "gorr_percent": s.get("gorr_bps", 0) / 100,
+        "gorr_meaning": "Gross Overriding Royalty Rate — share of CPO revenue routed to SAWIT holders",
         "token_rate_sawit_per_ton": s.get("token_rate"),
         "oracle_reputation": f"{s.get('oracle_reputation')}/100",
         "epochs_recorded": s.get("epoch_count"),
