@@ -17,7 +17,23 @@
           "ts": "2026-08-01T08:21:56.554130+00:00"
         }
       }
+    },
+    "6": {
+      "holders": {
+        "account-hash-57895ec9532fba625e63d3f7a5e250b50f9c5e0fb5321f8fa5890dd05d4ae2ec": {
+          "motes": "100000000000",
+          "status": "done",
+          "ts": "2026-09-01T11:10:04.234142+00:00"
+        }
+      }
     }
   },
-  "expired": {}
+  "expired": {
+    "5": {
+      "first_detected": "2026-09-01T11:09:28.856412+00:00",
+      "last_checked": "2026-09-01T11:09:28.856426+00:00",
+      "total_distribution_motes": "100000000000",
+      "unclaimed_motes": "100000000000"
+    }
+  }
 }

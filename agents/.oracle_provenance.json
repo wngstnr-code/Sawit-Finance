@@ -3,20 +3,20 @@
     "/api/kpbn/price": {
       "paid_via_x402": false,
       "resource_path": "/api/kpbn/price",
-      "timestamp": "2026-08-01T08:20:48.152835+00:00",
+      "timestamp": "2026-09-01T11:07:59.363454+00:00",
       "x402_provenance": "unpaid_fallback"
     },
     "/api/mpob/benchmark": {
       "paid_via_x402": false,
       "resource_path": "/api/mpob/benchmark",
-      "timestamp": "2026-08-01T08:20:48.153582+00:00",
+      "timestamp": "2026-09-01T11:07:59.363890+00:00",
       "x402_provenance": "unpaid_fallback"
     }
   },
   "latest": {
     "paid_via_x402": false,
     "resource_path": "/api/mpob/benchmark",
-    "timestamp": "2026-08-01T08:20:48.153582+00:00",
+    "timestamp": "2026-09-01T11:07:59.363890+00:00",
     "x402_provenance": "unpaid_fallback"
   }
 }
